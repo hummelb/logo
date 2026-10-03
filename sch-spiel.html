@@ -601,25 +601,41 @@ function tones(freqs, dur = 0.14, type = 'sine') {
    - "s":   noisy, energy mostly above 6 kHz
    - voiced sounds (l, w, b, k + vowel…): energy below 1 kHz dominates            */
 const Mic = {
-  ok: false, an: null, buf: null, binHz: 0, floor: null, handler: null, raf: 0,
+  ok: false, an: null, buf: null, binHz: 0, floor: null, handler: null, raf: 0, stream: null, src: null,
 
   async init() {
     if (this.ok) return true;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false }
-      });
       const ctx = audio();
       this.an = ctx.createAnalyser();
       this.an.fftSize = 1024;
       this.an.smoothingTimeConstant = 0.3;
-      ctx.createMediaStreamSource(stream).connect(this.an);
       this.buf = new Float32Array(this.an.frequencyBinCount);
       this.binHz = ctx.sampleRate / this.an.fftSize;
-      this.ok = true;
+      await this.open();
+      await wait(200);
       await this.calibrate();
-    } catch (e) { this.ok = false; }
+      this.close();
+      this.ok = true;
+    } catch (e) { this.close(); this.ok = false; }
     return this.ok;
+  },
+
+  /* The mic is only open while listening: on Android an open mic switches audio
+     into "call mode", which sends speech and sounds to the quiet earpiece. */
+  async open() {
+    if (this.stream) return;
+    this.stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+    });
+    this.src = audio().createMediaStreamSource(this.stream);
+    this.src.connect(this.an);
+  },
+
+  close() {
+    if (this.src) this.src.disconnect();
+    if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
+    this.src = this.stream = null;
   },
 
   bands() {
@@ -655,20 +671,24 @@ const Mic = {
     return { loud, sch, s, level };
   },
 
-  start(handler) {
+  async start(handler) {
     this.stop();
     this.handler = handler;
-    let last = performance.now();
+    try { await this.open(); } catch (e) { return; }
+    if (this.handler !== handler) { this.close(); return; }   // listening ended meanwhile
+    const t0 = performance.now();
+    let last = t0;
     const loop = (t) => {
       if (this.handler !== handler) return;
       const dt = Math.min(100, t - last); last = t;
+      if (t - t0 < 200) { this.raf = requestAnimationFrame(loop); return; }  // skip the mic's switch-on pop
       handler(this.analyse(), dt, t);
       if (this.handler === handler) this.raf = requestAnimationFrame(loop);
     };
     this.raf = requestAnimationFrame(loop);
   },
 
-  stop() { cancelAnimationFrame(this.raf); this.handler = null; }
+  stop() { cancelAnimationFrame(this.raf); this.handler = null; this.close(); }
 };
 
 /* ---------- listening sessions ---------- */
@@ -848,6 +868,8 @@ function renderProgress(popIndex = -1) {
 async function newGame() {
   $('#playBtn').disabled = $('#againBtn').disabled = true;
   audio();
+  // Speak once right inside the tap – mobile Chrome may otherwise block later speech.
+  if (window.speechSynthesis) speechSynthesis.speak(new SpeechSynthesisUtterance(' '));
   await Mic.init();
   document.body.classList.toggle('nomic', !Mic.ok);
   $('#playBtn').disabled = $('#againBtn').disabled = false;
