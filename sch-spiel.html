@@ -1,0 +1,1025 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Schlangis Sch-Spiel</title>
+<style>
+  :root {
+    --sky1: #e3f2fd;
+    --sky2: #fff8e1;
+    --ink: #3e2c23;
+    --card: #ffffff;
+    --good: #66bb6a;
+    --bad: #ef5350;
+    --sch: #e65100;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: "Comic Sans MS", "Chalkboard SE", "Baloo 2", system-ui, sans-serif;
+    color: var(--ink);
+    background: linear-gradient(180deg, var(--sky1), var(--sky2));
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  button { font: inherit; color: inherit; border: none; background: none; cursor: pointer; padding: 0; }
+  .sch { color: var(--sch); }
+
+  .screen { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 16px; gap: 14px; }
+  .screen.active { display: flex; }
+  .screen.withbar { padding-top: clamp(56px, 10vh, 76px); }
+
+  /* ---------- start ---------- */
+  h1 { margin: 0; font-size: clamp(32px, 7vw, 64px); text-align: center; }
+  .big-btn {
+    width: clamp(110px, 24vw, 160px); height: clamp(110px, 24vw, 160px);
+    border-radius: 50%; background: var(--good);
+    box-shadow: 0 8px 0 #388e3c, 0 12px 24px rgba(0,0,0,.2);
+    display: grid; place-items: center;
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  .big-btn:active { transform: translateY(6px); box-shadow: 0 2px 0 #388e3c; }
+  .big-btn:disabled { opacity: .5; animation: none; }
+  .big-btn svg { width: 55%; height: 55%; }
+  @keyframes pulse { 50% { transform: scale(1.08); } }
+  .parents { max-width: 560px; font-size: 14px; line-height: 1.4; text-align: center; opacity: .7; font-family: system-ui, sans-serif; }
+
+  .mascot { width: clamp(150px, 30vw, 240px); cursor: pointer; }
+  .mascot .tongue { transform-origin: 178px 78px; animation: tongue 1.4s infinite; }
+  @keyframes tongue { 0%, 60%, 100% { transform: scaleX(0); } 70%, 90% { transform: scaleX(1); } }
+  .mascot.wiggle svg { animation: wiggle .6s ease-in-out 2; }
+  @keyframes wiggle { 25% { transform: rotate(-8deg) translateY(-10px); } 75% { transform: rotate(8deg) translateY(-10px); } }
+  .hissing svg { animation: slither .25s ease-in-out infinite alternate; }
+
+  /* ---------- progress bar ---------- */
+  .progress { position: fixed; top: 10px; left: 0; right: 0; display: none; gap: 6px; justify-content: center; z-index: 5; }
+  body.bar .progress { display: flex; }
+  .progress svg { width: clamp(30px, 7vw, 48px); height: clamp(30px, 7vw, 48px); }
+  .progress .on { animation: starpop .7s cubic-bezier(.3,1.8,.5,1); }
+  @keyframes starpop { 0% { transform: scale(0) rotate(-180deg); } 100% { transform: scale(1) rotate(0); } }
+
+  /* ---------- listen game ---------- */
+  .prompt { display: flex; align-items: center; gap: 12px; }
+  .prompt .mascot { width: clamp(100px, 20vw, 160px); }
+  .speaker {
+    width: clamp(70px, 14vw, 96px); height: clamp(70px, 14vw, 96px); border-radius: 50%;
+    background: #ffca28; box-shadow: 0 6px 0 #f9a825, 0 10px 18px rgba(0,0,0,.15);
+    display: grid; place-items: center;
+  }
+  .speaker:active { transform: translateY(4px); box-shadow: 0 2px 0 #f9a825; }
+  .speaker svg { width: 60%; height: 60%; }
+  .speaker.talking svg .wave { animation: wave .5s ease-in-out infinite alternate; }
+  @keyframes wave { from { opacity: .2; } to { opacity: 1; } }
+  .hint { font-size: clamp(18px, 3.5vw, 26px); min-height: 1.4em; opacity: .55; }
+
+  .cards { display: flex; gap: clamp(12px, 4vw, 40px); justify-content: center; align-items: center; flex: 1; width: 100%; max-height: 60vh; }
+  .card {
+    position: relative;
+    width: min(42vw, 44vh, 320px); aspect-ratio: 1;
+    background: var(--card); border-radius: 32px;
+    box-shadow: 0 8px 0 #cfd8dc, 0 14px 28px rgba(0,0,0,.12);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    border: 6px solid transparent;
+    transition: border-color .2s;
+  }
+  .card:active { transform: translateY(4px); }
+  .card .pic { width: 82%; height: 82%; }
+  .card .pic svg { width: 100%; height: 100%; display: block; }
+  .card .cap { position: absolute; bottom: -1.5em; font-size: clamp(20px, 4vw, 30px); font-weight: bold; white-space: nowrap; }
+  .card.enter { animation: popin .5s cubic-bezier(.3,1.6,.5,1) both; }
+  .card.enter + .card.enter { animation-delay: .12s; }
+  @keyframes popin { from { transform: scale(0); } to { transform: scale(1); } }
+  .card.right { border-color: var(--good); animation: hop .6s ease; }
+  @keyframes hop { 30% { transform: translateY(-24px) scale(1.06); } 60% { transform: translateY(0) scale(.97); } }
+  .card.wrong { border-color: var(--bad); animation: shake .5s ease; }
+  @keyframes shake { 20%, 60% { transform: translateX(-14px) rotate(-3deg); } 40%, 80% { transform: translateX(14px) rotate(3deg); } }
+
+  /* ---------- speak game ---------- */
+  .say-title { font-size: clamp(28px, 6vw, 48px); font-weight: bold; text-align: center; }
+  .say-row { display: flex; align-items: center; gap: clamp(8px, 3vw, 30px); }
+  .say-row .mascot { width: clamp(100px, 20vw, 170px); }
+  #sayCard { width: min(52vw, 40vh, 320px); }
+
+  .mic {
+    position: relative; width: clamp(80px, 16vw, 110px); height: clamp(80px, 16vw, 110px);
+    border-radius: 50%; background: #b0bec5; color: #b0bec5;
+    display: grid; place-items: center; --lvl: 0;
+    transition: background .15s, color .15s;
+  }
+  .mic svg { width: 55%; position: relative; }
+  .mic .ring { position: absolute; inset: 0; border-radius: 50%; background: currentColor; opacity: .35; transform: scale(calc(1 + var(--lvl) * .9)); transition: transform .08s; }
+  .mic.listening { background: #42a5f5; color: #42a5f5; animation: pulse 1.6s ease-in-out infinite; }
+  .mic.hearsch { background: #ff7043; color: #ff7043; }
+  .micnote { display: none; font-size: 14px; opacity: .7; font-family: system-ui, sans-serif; text-align: center; }
+  body.nomic .micnote { display: block; }
+
+  .schfly { position: fixed; pointer-events: none; z-index: 20; font-weight: bold; font-size: 26px; color: var(--sch); animation: schfly 1s ease-out forwards; }
+  @keyframes schfly { from { transform: translate(-50%, -50%) scale(.6); opacity: 1; } to { transform: translate(calc(-50% + var(--dx)), calc(-50% - 70px)) scale(1.3); opacity: 0; } }
+
+  /* ---------- hiss race ---------- */
+  .track {
+    position: relative; width: min(94vw, 760px); height: clamp(130px, 28vh, 220px);
+    background: linear-gradient(transparent 72%, #9ccc65 72%);
+    border-radius: 24px;
+  }
+  .runner { --w: clamp(110px, 24vw, 190px); position: absolute; bottom: 8%; width: var(--w); left: calc((100% - var(--w)) * var(--p, 0)); transition: left .15s linear; }
+  .runner.go svg { animation: slither .3s ease-in-out infinite alternate; }
+  @keyframes slither { from { transform: scaleY(.92) rotate(-3deg); } to { transform: scaleY(1.05) rotate(3deg); } }
+  .goal { position: absolute; right: 1%; bottom: 20%; width: clamp(50px, 10vw, 80px); animation: bob 1s ease-in-out infinite alternate; }
+  .goal.eaten { animation: eaten .5s forwards; }
+  @keyframes eaten { to { transform: scale(0) rotate(90deg); opacity: 0; } }
+
+  /* ---------- parent override ---------- */
+  #parentOk {
+    position: fixed; right: 12px; bottom: 12px; z-index: 40; display: none;
+    width: 58px; height: 58px; border-radius: 50%; background: #fff;
+    box-shadow: 0 4px 12px rgba(0,0,0,.15); font-size: 28px; opacity: .6;
+    transition: transform .7s, background .7s, opacity .2s;
+  }
+  body.listen #parentOk { display: grid; place-items: center; }
+  #parentOk.holding { transform: scale(1.35); background: #a5d6a7; opacity: 1; }
+
+  .spark { position: fixed; pointer-events: none; font-size: 32px; z-index: 20; animation: spark .9s ease-out forwards; }
+  @keyframes spark { from { transform: translate(-50%, -50%) scale(.4); opacity: 1; } to { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.2) rotate(180deg); opacity: 0; } }
+
+  /* ---------- celebration ---------- */
+  #party { background: rgba(255,255,255,.88); z-index: 10; }
+  #party .title { font-size: clamp(44px, 10vw, 90px); font-weight: bold; color: #ff7043; text-shadow: 0 4px 0 #ffccbc; animation: grow .7s cubic-bezier(.3,1.8,.5,1); }
+  @keyframes grow { from { transform: scale(0) rotate(-20deg); } to { transform: scale(1); } }
+  .pair { display: flex; gap: clamp(16px, 5vw, 50px); }
+  .pair figure { margin: 0; text-align: center; font-size: clamp(22px, 4.5vw, 34px); font-weight: bold; }
+  .pair figure > div { width: min(32vw, 26vh, 200px); aspect-ratio: 1; background: #fff; border-radius: 24px; box-shadow: 0 6px 18px rgba(0,0,0,.12); padding: 8px; animation: bob 1s ease-in-out infinite alternate; }
+  .pair figure:nth-child(2) > div { animation-delay: .5s; }
+  .pair svg { width: 100%; height: 100%; }
+  @keyframes bob { to { transform: translateY(-10px) rotate(3deg); } }
+  #party .mascot svg, #end .mascot svg { animation: dance .8s ease-in-out infinite; transform-origin: 50% 90%; }
+  @keyframes dance { 0%, 100% { transform: rotate(-10deg) scale(1); } 50% { transform: rotate(10deg) scale(1.12) translateY(-16px); } }
+  .next {
+    width: 96px; height: 96px; border-radius: 50%; background: var(--good);
+    box-shadow: 0 7px 0 #388e3c; display: grid; place-items: center;
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  .next svg { width: 55%; }
+
+  .confetti { position: fixed; top: -20px; width: 12px; height: 18px; z-index: 30; pointer-events: none; animation: fall linear forwards; }
+  @keyframes fall { to { transform: translateY(110vh) rotate(var(--r)); } }
+
+  #end .stars { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+  #end .stars svg { width: 48px; height: 48px; animation: bob .6s ease-in-out infinite alternate; }
+
+  @media (max-height: 520px) {
+    .prompt .mascot, .say-row .mascot { width: 80px; }
+    #party .title { font-size: 40px; }
+    .say-title { font-size: 24px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="progress" id="progress"></div>
+<button id="parentOk" aria-label="Eltern: Sch war gut">👍</button>
+
+<!-- START -->
+<section id="start" class="screen active">
+  <div class="mascot" data-mascot></div>
+  <h1><span class="sch">Sch</span>langis <span class="sch">Sch</span>-Spiel</h1>
+  <button class="big-btn" id="playBtn" aria-label="Spielen">
+    <svg viewBox="0 0 100 100"><path d="M30 18 L84 50 L30 82 Z" fill="#fff" stroke="#fff" stroke-width="8" stroke-linejoin="round"/></svg>
+  </button>
+  <p class="parents">
+    Für Eltern: Das Spiel hört über das Mikrofon, ob ein Wort mit „Sch" beginnt.
+    Die Auswertung passiert nur hier im Browser – es wird nichts aufgenommen oder gesendet.
+    Klang das Sch gut, wurde aber nicht erkannt? Den 👍-Knopf unten rechts kurz gedrückt halten.
+  </p>
+</section>
+
+<!-- HISS RACE -->
+<section id="hiss" class="screen withbar">
+  <div class="say-title">Zisch wie Schlangi!</div>
+  <div class="track">
+    <div class="runner" id="runner" data-snake></div>
+    <div class="goal" id="goal"></div>
+  </div>
+  <div class="mic"><div class="ring"></div><svg viewBox="0 0 100 100"><use href="#micIcon"/></svg></div>
+  <div class="micnote">Kein Mikrofon – Schlangi kriecht von allein. Einfach mitzischen!</div>
+</section>
+
+<!-- LISTEN -->
+<section id="game" class="screen withbar">
+  <div class="prompt">
+    <div class="mascot" data-mascot></div>
+    <button class="speaker" id="speaker" aria-label="Nochmal hören">
+      <svg viewBox="0 0 100 100">
+        <path d="M15 38 H32 L55 18 V82 L32 62 H15 Z" fill="#5d4037" stroke="#5d4037" stroke-width="4" stroke-linejoin="round"/>
+        <path class="wave" d="M66 36 Q76 50 66 64" fill="none" stroke="#5d4037" stroke-width="7" stroke-linecap="round"/>
+        <path class="wave" d="M76 24 Q94 50 76 76" fill="none" stroke="#5d4037" stroke-width="7" stroke-linecap="round" style="animation-delay:.25s"/>
+      </svg>
+    </button>
+  </div>
+  <div class="hint" id="hint"></div>
+  <div class="cards">
+    <button class="card"><div class="pic"></div><div class="cap"></div></button>
+    <button class="card"><div class="pic"></div><div class="cap"></div></button>
+  </div>
+</section>
+
+<!-- SPEAK -->
+<section id="say" class="screen withbar">
+  <div class="say-title">Jetzt du!</div>
+  <div class="say-row">
+    <div class="mascot" data-mascot></div>
+    <button class="card" id="sayCard" aria-label="Nochmal hören"><div class="pic" id="sayPic"></div><div class="cap" id="sayCap"></div></button>
+  </div>
+  <div style="height:1.4em"></div>
+  <div class="mic"><div class="ring"></div><svg viewBox="0 0 100 100"><use href="#micIcon"/></svg></div>
+  <div class="micnote">Kein Mikrofon – Eltern: 👍 gedrückt halten, wenn das Sch gut klang.</div>
+</section>
+
+<!-- PAIR SOLVED -->
+<section id="party" class="screen">
+  <div class="title" id="partyTitle">Super!</div>
+  <div class="pair" id="partyPair"></div>
+  <div class="mascot" data-mascot></div>
+  <button class="next" id="nextBtn" aria-label="Weiter">
+    <svg viewBox="0 0 100 100"><path d="M20 50 H75 M52 25 L78 50 L52 75" fill="none" stroke="#fff" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+</section>
+
+<!-- END -->
+<section id="end" class="screen">
+  <h1>Du bist ein <span class="sch">Sch</span>-Profi!</h1>
+  <div class="stars" id="endStars"></div>
+  <div class="mascot" data-mascot></div>
+  <button class="big-btn" id="againBtn" aria-label="Nochmal spielen">
+    <svg viewBox="0 0 100 100"><path d="M78 50 A28 28 0 1 1 64 26" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round"/><path d="M56 10 L74 26 L52 36 Z" fill="#fff" stroke="#fff" stroke-width="6" stroke-linejoin="round"/></svg>
+  </button>
+</section>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="micIcon" viewBox="0 0 100 100">
+    <rect x="36" y="10" width="28" height="50" rx="14" fill="#fff"/>
+    <path d="M24 44 Q24 72 50 72 Q76 72 76 44" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+    <path d="M50 72 V86 M36 88 H64" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+  </symbol>
+</svg>
+
+<script>
+/* ================= SVG pictures ================= */
+const IMG = {
+  schlauch: `<svg viewBox="0 0 200 200">
+    <path d="M50 182 L85 100 L120 182" fill="none" stroke="#8d6e63" stroke-width="9" stroke-linecap="round"/>
+    <circle cx="85" cy="100" r="54" fill="#2e7d32"/>
+    <circle cx="85" cy="100" r="44" fill="none" stroke="#66bb6a" stroke-width="8"/>
+    <circle cx="85" cy="100" r="31" fill="none" stroke="#66bb6a" stroke-width="8"/>
+    <circle cx="85" cy="100" r="18" fill="none" stroke="#66bb6a" stroke-width="8"/>
+    <circle cx="85" cy="100" r="8" fill="#ffca28"/>
+    <path d="M125 132 Q150 182 168 140 Q180 110 160 82" fill="none" stroke="#43a047" stroke-width="13" stroke-linecap="round"/>
+    <rect x="150" y="56" width="18" height="28" rx="5" fill="#ff9800" transform="rotate(-15 159 70)"/>
+    <path d="M152 55 Q140 22 108 22" fill="none" stroke="#4fc3f7" stroke-width="5" stroke-linecap="round" stroke-dasharray="2 10"/>
+    <path d="M160 52 Q160 18 134 8" fill="none" stroke="#4fc3f7" stroke-width="5" stroke-linecap="round" stroke-dasharray="2 10"/>
+  </svg>`,
+
+  lauch: `<svg viewBox="0 0 200 200">
+    <path d="M90 180 L80 194 M96 182 L94 196 M104 182 L108 196 M110 180 L120 192" stroke="#bcaaa4" stroke-width="3" stroke-linecap="round"/>
+    <path d="M90 95 Q55 60 40 14 Q78 46 102 92 Z" fill="#2e7d32"/>
+    <path d="M110 95 Q140 55 168 22 Q142 66 116 100 Z" fill="#388e3c"/>
+    <path d="M96 95 Q92 50 104 6 Q114 50 108 95 Z" fill="#43a047"/>
+    <rect x="84" y="88" width="32" height="36" rx="8" fill="#aed581"/>
+    <rect x="84" y="112" width="32" height="70" rx="14" fill="#fbfbf4" stroke="#e0e0d0" stroke-width="2"/>
+    <path d="M92 120 V172 M100 118 V176 M108 120 V172" stroke="#ececdc" stroke-width="2"/>
+  </svg>`,
+
+  schal: `<svg viewBox="0 0 200 200">
+    <path d="M38 52 Q100 92 162 52 L166 84 Q100 124 34 84 Z" fill="#e53935"/>
+    <path d="M42 66 Q100 104 160 66" fill="none" stroke="#fff" stroke-width="7"/>
+    <g transform="rotate(8 125 92)">
+      <rect x="106" y="86" width="38" height="84" rx="4" fill="#e53935"/>
+      <rect x="106" y="104" width="38" height="11" fill="#fff"/><rect x="106" y="136" width="38" height="11" fill="#fff"/>
+      <path d="M110 170 v14 M118 170 v14 M126 170 v14 M134 170 v14 M141 170 v14" stroke="#e53935" stroke-width="4" stroke-linecap="round"/>
+    </g>
+    <g transform="rotate(-6 85 92)">
+      <rect x="66" y="88" width="38" height="72" rx="4" fill="#c62828"/>
+      <rect x="66" y="106" width="38" height="11" fill="#fff"/><rect x="66" y="132" width="38" height="11" fill="#fff"/>
+      <path d="M70 160 v14 M78 160 v14 M86 160 v14 M94 160 v14 M101 160 v14" stroke="#c62828" stroke-width="4" stroke-linecap="round"/>
+    </g>
+  </svg>`,
+
+  wal: `<svg viewBox="0 0 200 200">
+    <path d="M72 64 Q66 42 54 32 M72 64 Q78 42 92 30 M72 64 V34" stroke="#4fc3f7" stroke-width="6" stroke-linecap="round" fill="none"/>
+    <path d="M14 122 Q14 68 84 68 Q146 68 156 112 Q168 100 176 74 Q186 92 198 96 Q184 114 166 140 Q148 170 90 170 Q14 170 14 122 Z" fill="#42a5f5"/>
+    <path d="M20 134 Q70 174 144 148 Q124 170 88 170 Q34 168 20 134 Z" fill="#bbdefb"/>
+    <path d="M82 140 Q100 156 78 164 Q70 152 82 140 Z" fill="#1e88e5"/>
+    <circle cx="50" cy="112" r="7" fill="#0d47a1"/><circle cx="52" cy="110" r="2.5" fill="#fff"/>
+    <path d="M22 126 Q36 138 54 130" fill="none" stroke="#0d47a1" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="66" cy="124" r="6" fill="#f48fb1" opacity=".6"/>
+    <path d="M0 188 q12 -10 25 0 t25 0 t25 0 t25 0 t25 0 t25 0 t25 0 t25 0" fill="none" stroke="#81d4fa" stroke-width="5"/>
+  </svg>`,
+
+  schuh: `<svg viewBox="0 0 200 200">
+    <path d="M28 150 V96 Q28 76 52 76 H82 Q92 108 128 114 L164 122 Q184 128 184 146 V150 Z" fill="#1e88e5"/>
+    <path d="M150 119 L164 122 Q184 128 184 146 V150 H140 Q138 128 150 119 Z" fill="#fff"/>
+    <rect x="22" y="146" width="168" height="18" rx="9" fill="#fff" stroke="#cfd8dc" stroke-width="3"/>
+    <path d="M86 96 L100 90 M94 104 L110 98 M104 110 L120 104" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
+    <path d="M40 110 Q70 120 80 140" fill="none" stroke="#bbdefb" stroke-width="6" stroke-linecap="round"/>
+  </svg>`,
+
+  kuh: `<svg viewBox="0 0 200 200">
+    <path d="M62 50 Q46 30 56 16 Q62 36 76 44 Z" fill="#fff3e0" stroke="#bcaaa4" stroke-width="2"/>
+    <path d="M138 50 Q154 30 144 16 Q138 36 124 44 Z" fill="#fff3e0" stroke="#bcaaa4" stroke-width="2"/>
+    <ellipse cx="34" cy="72" rx="24" ry="12" fill="#fff" stroke="#9e9e9e" stroke-width="2" transform="rotate(-20 34 72)"/>
+    <ellipse cx="166" cy="72" rx="24" ry="12" fill="#fff" stroke="#9e9e9e" stroke-width="2" transform="rotate(20 166 72)"/>
+    <ellipse cx="36" cy="72" rx="13" ry="6" fill="#f8bbd0" transform="rotate(-20 36 72)"/>
+    <ellipse cx="164" cy="72" rx="13" ry="6" fill="#f8bbd0" transform="rotate(20 164 72)"/>
+    <ellipse cx="100" cy="94" rx="54" ry="60" fill="#fff" stroke="#9e9e9e" stroke-width="3"/>
+    <path d="M60 62 Q80 48 86 74 Q76 94 58 82 Z" fill="#424242"/>
+    <path d="M126 98 Q148 92 150 112 Q138 124 124 112 Z" fill="#424242"/>
+    <circle cx="80" cy="92" r="7" fill="#212121"/><circle cx="120" cy="92" r="7" fill="#212121"/>
+    <circle cx="82" cy="90" r="2.5" fill="#fff"/><circle cx="122" cy="90" r="2.5" fill="#fff"/>
+    <ellipse cx="100" cy="146" rx="44" ry="30" fill="#f8bbd0" stroke="#f48fb1" stroke-width="2"/>
+    <ellipse cx="86" cy="142" rx="6" ry="8" fill="#c2185b"/><ellipse cx="114" cy="142" rx="6" ry="8" fill="#c2185b"/>
+    <path d="M86 162 Q100 170 114 162" fill="none" stroke="#c2185b" stroke-width="3" stroke-linecap="round"/>
+    <path d="M92 36 Q100 26 108 36" fill="none" stroke="#424242" stroke-width="5" stroke-linecap="round"/>
+  </svg>`,
+
+  schaum: `<svg viewBox="0 0 200 200">
+    <g fill="none" stroke="#81d4fa" stroke-width="3">
+      <circle cx="40" cy="30" r="9"/><circle cx="160" cy="24" r="12"/><circle cx="178" cy="56" r="6"/><circle cx="22" cy="58" r="5"/>
+    </g>
+    <g fill="#b3e5fc">
+      <circle cx="38" cy="108" r="24"/><circle cx="68" cy="92" r="30"/><circle cx="104" cy="82" r="34"/><circle cx="140" cy="92" r="30"/>
+      <circle cx="166" cy="106" r="22"/><circle cx="56" cy="70" r="20"/><circle cx="122" cy="56" r="24"/><circle cx="88" cy="52" r="18"/>
+    </g>
+    <g fill="#fff">
+      <circle cx="38" cy="108" r="21"/><circle cx="68" cy="92" r="27"/><circle cx="104" cy="82" r="31"/><circle cx="140" cy="92" r="27"/>
+      <circle cx="166" cy="106" r="19"/><circle cx="56" cy="70" r="17"/><circle cx="122" cy="56" r="21"/><circle cx="88" cy="52" r="15"/>
+    </g>
+    <path d="M14 112 H186 Q184 172 134 174 H66 Q16 172 14 112 Z" fill="#f48fb1"/>
+    <rect x="10" y="106" width="180" height="12" rx="6" fill="#ec407a"/>
+    <path d="M50 172 L44 190 M150 172 L156 190" stroke="#ec407a" stroke-width="8" stroke-linecap="round"/>
+  </svg>`,
+
+  baum: `<svg viewBox="0 0 200 200">
+    <ellipse cx="100" cy="186" rx="80" ry="9" fill="#a5d6a7"/>
+    <path d="M88 186 L92 120 L108 120 L112 186 Z" fill="#795548"/>
+    <circle cx="58" cy="104" r="34" fill="#388e3c"/>
+    <circle cx="142" cy="104" r="34" fill="#388e3c"/>
+    <circle cx="100" cy="72" r="56" fill="#43a047"/>
+    <g fill="#e53935"><circle cx="76" cy="62" r="7"/><circle cx="124" cy="52" r="7"/><circle cx="108" cy="96" r="7"/><circle cx="56" cy="108" r="7"/><circle cx="146" cy="100" r="7"/></g>
+  </svg>`,
+
+  schere: `<svg viewBox="0 0 200 200">
+    <path d="M92 114 L168 22 Q178 20 176 32 L108 120 Z" fill="#b0bec5" stroke="#78909c" stroke-width="2"/>
+    <path d="M108 114 L32 22 Q22 20 24 32 L92 120 Z" fill="#cfd8dc" stroke="#78909c" stroke-width="2"/>
+    <path d="M100 110 L80 134 M100 110 L120 134" stroke="#e53935" stroke-width="13" stroke-linecap="round"/>
+    <circle cx="66" cy="154" r="24" fill="none" stroke="#e53935" stroke-width="12"/>
+    <circle cx="134" cy="154" r="24" fill="none" stroke="#e53935" stroke-width="12"/>
+    <circle cx="100" cy="110" r="6" fill="#ffca28"/>
+  </svg>`,
+
+  beere: `<svg viewBox="0 0 200 200">
+    <path d="M100 58 Q162 52 156 102 Q150 150 100 188 Q50 150 44 102 Q38 52 100 58 Z" fill="#e53935"/>
+    <g fill="#ffeb3b">
+      <ellipse cx="74" cy="90" rx="3" ry="5"/><ellipse cx="100" cy="84" rx="3" ry="5"/><ellipse cx="126" cy="90" rx="3" ry="5"/>
+      <ellipse cx="62" cy="116" rx="3" ry="5"/><ellipse cx="88" cy="112" rx="3" ry="5"/><ellipse cx="114" cy="112" rx="3" ry="5"/><ellipse cx="140" cy="116" rx="3" ry="5"/>
+      <ellipse cx="76" cy="140" rx="3" ry="5"/><ellipse cx="100" cy="138" rx="3" ry="5"/><ellipse cx="124" cy="140" rx="3" ry="5"/>
+      <ellipse cx="90" cy="162" rx="3" ry="5"/><ellipse cx="110" cy="162" rx="3" ry="5"/>
+    </g>
+    <path d="M100 62 L66 46 L86 56 L76 30 L100 50 L124 30 L114 56 L134 46 Z" fill="#43a047"/>
+    <path d="M100 50 V22" stroke="#2e7d32" stroke-width="6" stroke-linecap="round"/>
+    <ellipse cx="66" cy="96" rx="7" ry="14" fill="#fff" opacity=".4" transform="rotate(20 66 96)"/>
+  </svg>`,
+
+  schiene: `<svg viewBox="0 0 200 200">
+    <path d="M72 18 H128 L196 196 H4 Z" fill="#d7ccc8"/>
+    <g fill="#8d6e63">
+      <rect x="80" y="30" width="40" height="6"/><rect x="74" y="52" width="52" height="8"/><rect x="64" y="80" width="72" height="10"/>
+      <rect x="50" y="116" width="100" height="12"/><rect x="30" y="162" width="140" height="15"/>
+    </g>
+    <path d="M90 18 L48 196" stroke="#607d8b" stroke-width="8"/>
+    <path d="M110 18 L152 196" stroke="#607d8b" stroke-width="8"/>
+    <path d="M90 18 L48 196" stroke="#cfd8dc" stroke-width="2"/>
+    <path d="M110 18 L152 196" stroke="#cfd8dc" stroke-width="2"/>
+  </svg>`,
+
+  biene: `<svg viewBox="0 0 200 200">
+    <ellipse cx="88" cy="62" rx="22" ry="34" fill="#e1f5fe" stroke="#81d4fa" stroke-width="3" transform="rotate(-20 88 62)"/>
+    <ellipse cx="124" cy="62" rx="22" ry="34" fill="#e1f5fe" stroke="#81d4fa" stroke-width="3" transform="rotate(20 124 62)"/>
+    <path d="M158 115 L180 115 L158 124 Z" fill="#3e2723"/>
+    <ellipse cx="104" cy="118" rx="58" ry="42" fill="#fdd835"/>
+    <path d="M84 79 Q76 118 84 157 M112 77 Q104 118 112 159 M140 86 Q134 118 140 150" fill="none" stroke="#3e2723" stroke-width="14"/>
+    <path d="M38 88 Q30 62 18 58 M50 86 Q52 60 44 50" fill="none" stroke="#3e2723" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="18" cy="58" r="5" fill="#3e2723"/><circle cx="44" cy="50" r="5" fill="#3e2723"/>
+    <circle cx="44" cy="114" r="30" fill="#ffee58"/>
+    <circle cx="34" cy="108" r="5" fill="#212121"/><circle cx="54" cy="108" r="5" fill="#212121"/>
+    <circle cx="35" cy="106" r="1.8" fill="#fff"/><circle cx="55" cy="106" r="1.8" fill="#fff"/>
+    <path d="M34 124 Q44 132 54 124" fill="none" stroke="#3e2723" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="26" cy="120" r="4" fill="#f48fb1" opacity=".7"/><circle cx="62" cy="120" r="4" fill="#f48fb1" opacity=".7"/>
+  </svg>`,
+
+  schuessel: `<svg viewBox="0 0 200 200">
+    <path d="M18 86 Q22 170 100 172 Q178 170 182 86 Z" fill="#ff9800"/>
+    <ellipse cx="100" cy="86" rx="82" ry="20" fill="#ffe0b2" stroke="#ef6c00" stroke-width="5"/>
+    <ellipse cx="100" cy="92" rx="64" ry="11" fill="#ffcc80"/>
+    <rect x="70" y="166" width="60" height="14" rx="7" fill="#ef6c00"/>
+    <g fill="#fff"><circle cx="54" cy="128" r="7"/><circle cx="84" cy="144" r="7"/><circle cx="116" cy="144" r="7"/><circle cx="146" cy="128" r="7"/><circle cx="100" cy="122" r="7"/></g>
+  </svg>`,
+
+  ruessel: `<svg viewBox="0 0 200 200">
+    <ellipse cx="42" cy="88" rx="40" ry="52" fill="#90a4ae"/>
+    <ellipse cx="158" cy="88" rx="40" ry="52" fill="#90a4ae"/>
+    <ellipse cx="46" cy="90" rx="26" ry="36" fill="#f8bbd0"/>
+    <ellipse cx="154" cy="90" rx="26" ry="36" fill="#f8bbd0"/>
+    <path d="M100 110 Q96 162 122 174 Q144 182 150 160" fill="none" stroke="#b0bec5" stroke-width="28" stroke-linecap="round"/>
+    <path d="M90 140 h18 M92 154 h18 M104 168 h14" stroke="#90a4ae" stroke-width="3" stroke-linecap="round"/>
+    <ellipse cx="100" cy="80" rx="50" ry="52" fill="#b0bec5"/>
+    <path d="M76 118 Q68 136 80 142" fill="none" stroke="#fffde7" stroke-width="7" stroke-linecap="round"/>
+    <path d="M124 118 Q132 136 120 142" fill="none" stroke="#fffde7" stroke-width="7" stroke-linecap="round"/>
+    <circle cx="82" cy="76" r="7" fill="#212121"/><circle cx="118" cy="76" r="7" fill="#212121"/>
+    <circle cx="84" cy="74" r="2.5" fill="#fff"/><circle cx="120" cy="74" r="2.5" fill="#fff"/>
+    <circle cx="70" cy="96" r="6" fill="#f48fb1" opacity=".6"/><circle cx="130" cy="96" r="6" fill="#f48fb1" opacity=".6"/>
+  </svg>`,
+
+  schild: `<svg viewBox="0 0 200 200">
+    <rect x="0" y="182" width="200" height="18" fill="#a5d6a7"/>
+    <rect x="94" y="100" width="12" height="86" fill="#9e9e9e"/>
+    <path d="M100 18 L174 142 H26 Z" fill="#fff" stroke="#e53935" stroke-width="14" stroke-linejoin="round"/>
+    <rect x="93" y="62" width="14" height="44" rx="6" fill="#212121"/>
+    <circle cx="100" cy="122" r="8" fill="#212121"/>
+  </svg>`,
+
+  bild: `<svg viewBox="0 0 200 200">
+    <path d="M100 18 L50 58 M100 18 L150 58" stroke="#8d6e63" stroke-width="3"/>
+    <circle cx="100" cy="18" r="5" fill="#616161"/>
+    <rect x="22" y="56" width="156" height="124" rx="6" fill="#ffb300" stroke="#e65100" stroke-width="4"/>
+    <rect x="36" y="70" width="128" height="96" fill="#bbdefb"/>
+    <path d="M36 166 L80 104 L106 140 L130 114 L164 166 Z" fill="#66bb6a"/>
+    <circle cx="140" cy="92" r="12" fill="#fdd835"/>
+  </svg>`
+};
+
+const SNAKE = `<svg viewBox="0 0 210 140">
+  <path d="M20 112 Q50 72 80 106 T140 96" fill="none" stroke="#7cb342" stroke-width="24" stroke-linecap="round"/>
+  <g fill="#558b2f"><circle cx="34" cy="98" r="4"/><circle cx="62" cy="88" r="4"/><circle cx="92" cy="112" r="4"/><circle cx="120" cy="104" r="4"/></g>
+  <path class="tongue" d="M178 78 H196 L203 71 M196 78 L203 85" fill="none" stroke="#e53935" stroke-width="3.5" stroke-linecap="round"/>
+  <ellipse cx="152" cy="74" rx="32" ry="26" fill="#8bc34a"/>
+  <circle cx="140" cy="62" r="10" fill="#fff"/><circle cx="164" cy="62" r="10" fill="#fff"/>
+  <circle cx="142" cy="63" r="5" fill="#212121"/><circle cx="166" cy="63" r="5" fill="#212121"/>
+  <circle cx="144" cy="61" r="1.8" fill="#fff"/><circle cx="168" cy="61" r="1.8" fill="#fff"/>
+  <circle cx="132" cy="80" r="5" fill="#f48fb1" opacity=".7"/><circle cx="174" cy="80" r="5" fill="#f48fb1" opacity=".7"/>
+  <path d="M142 82 Q153 92 164 82" fill="none" stroke="#33691e" stroke-width="3" stroke-linecap="round"/>
+</svg>`;
+
+const APPLE = `<svg viewBox="0 0 100 100">
+  <path d="M50 30 Q70 15 85 35 Q98 60 80 85 Q65 98 50 88 Q35 98 20 85 Q2 60 15 35 Q30 15 50 30 Z" fill="#e53935"/>
+  <path d="M50 30 Q52 15 58 8" stroke="#6d4c41" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M54 18 Q70 6 80 16 Q68 26 54 18 Z" fill="#43a047"/>
+  <ellipse cx="32" cy="45" rx="6" ry="10" fill="#fff" opacity=".5"/>
+</svg>`;
+
+const STAR = (on) => `<svg viewBox="0 0 100 100" class="${on ? 'on' : ''}"><path d="M50 6 L62 37 L95 38 L69 59 L78 92 L50 73 L22 92 L31 59 L5 38 L38 37 Z" fill="${on ? '#ffca28' : '#e0e0e0'}" stroke="${on ? '#f9a825' : '#bdbdbd'}" stroke-width="5" stroke-linejoin="round"/></svg>`;
+
+/* ================= Word pairs: "Sch" at the start vs. same word without it ================= */
+const PAIRS = [
+  [{ name: 'Schlauch', art: 'der', img: 'schlauch' },  { name: 'Lauch',  art: 'der', img: 'lauch' }],
+  [{ name: 'Schal',    art: 'der', img: 'schal' },     { name: 'Wal',    art: 'der', img: 'wal' }],
+  [{ name: 'Schuh',    art: 'der', img: 'schuh' },     { name: 'Kuh',    art: 'die', img: 'kuh' }],
+  [{ name: 'Schaum',   art: 'der', img: 'schaum' },    { name: 'Baum',   art: 'der', img: 'baum' }],
+  [{ name: 'Schere',   art: 'die', img: 'schere' },    { name: 'Beere',  art: 'die', img: 'beere' }],
+  [{ name: 'Schiene',  art: 'die', img: 'schiene' },   { name: 'Biene',  art: 'die', img: 'biene' }],
+  [{ name: 'Schüssel', art: 'die', img: 'schuessel' }, { name: 'Rüssel', art: 'der', img: 'ruessel' }],
+  [{ name: 'Schild',   art: 'das', img: 'schild' },    { name: 'Bild',   art: 'das', img: 'bild' }],
+];
+const ROUNDS = 5;          // pairs per game
+const BONUS_AFTER = 3;     // extra hiss race after this many pairs
+
+const PRAISE = ['Super!', 'Toll!', 'Prima!', 'Klasse!', 'Richtig!', 'Juhu!'];
+const PARTY_TITLES = ['Super!', 'Toll gemacht!', 'Klasse!', 'Wow!', 'Juhu!'];
+
+/* ================= Helpers ================= */
+const $ = (s) => document.querySelector(s);
+const rand = (a) => a[Math.floor(Math.random() * a.length)];
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const cap = (s) => s[0].toUpperCase() + s.slice(1);
+const shuffle = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const hl = (w) => w.replace(/^sch/i, (m) => `<span class="sch">${m}</span>`);
+
+document.querySelectorAll('[data-mascot]').forEach((m) => {
+  m.innerHTML = SNAKE;
+  m.addEventListener('click', () => { if (!listener) { wiggle(m); hiss(700); } });
+});
+$('#runner').innerHTML = SNAKE;
+$('#goal').innerHTML = APPLE;
+
+function wiggle(el) { el.classList.remove('wiggle'); void el.offsetWidth; el.classList.add('wiggle'); }
+
+function show(id) {
+  document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === id));
+  document.body.classList.toggle('bar', ['hiss', 'game', 'say'].includes(id));
+}
+
+/* ---------- audio context ---------- */
+let actx;
+function audio() {
+  actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+  if (actx.state === 'suspended') actx.resume();
+  return actx;
+}
+
+/* ---------- speech ---------- */
+let voice = null;
+function pickVoice() {
+  const vs = speechSynthesis.getVoices().filter((v) => v.lang && v.lang.toLowerCase().startsWith('de'));
+  voice = vs.find((v) => /google|anna|petra|helena|katja/i.test(v.name)) || vs[0] || null;
+}
+if ('speechSynthesis' in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+
+function speak(text) {
+  return new Promise((resolve) => {
+    if (!('speechSynthesis' in window)) { resolve(); return; }
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'de-DE'; if (voice) u.voice = voice;
+    u.rate = 0.8; u.pitch = 1.15;
+    let done = false;
+    const fin = () => { if (!done) { done = true; $('#speaker').classList.remove('talking'); resolve(); } };
+    u.onend = fin; u.onerror = fin;
+    setTimeout(fin, 1500 + text.length * 110);
+    $('#speaker').classList.add('talking');
+    speechSynthesis.speak(u);
+  });
+}
+
+/* Schlangi's hiss: band-passed noise around 2.6 kHz sounds like a long "schhh" */
+function hiss(ms = 1000) {
+  try {
+    const ctx = audio();
+    const len = Math.floor(ctx.sampleRate * ms / 1000);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2600; bp.Q.value = 1.1;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 5000;
+    const g = ctx.createGain(), t = ctx.currentTime, end = t + ms / 1000;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.6, t + 0.08);
+    g.gain.setValueAtTime(0.6, end - 0.15);
+    g.gain.exponentialRampToValueAtTime(0.0001, end);
+    src.connect(bp).connect(lp).connect(g).connect(ctx.destination);
+    src.start(t);
+  } catch (e) { /* no audio – fine */ }
+  const el = document.querySelector('.screen.active .runner, .screen.active [data-mascot]');
+  if (el) {
+    el.classList.add('hissing');
+    const iv = setInterval(() => schFly(el), 180);
+    setTimeout(() => { clearInterval(iv); el.classList.remove('hissing'); }, ms);
+  }
+  return wait(ms + 100);
+}
+
+/* ---------- sound effects ---------- */
+function tones(freqs, dur = 0.14, type = 'sine') {
+  try {
+    const ctx = audio(), t0 = ctx.currentTime;
+    freqs.forEach((f, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain(), t = t0 + i * dur;
+      o.type = type; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.2, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur * 1.8);
+      o.connect(g).connect(ctx.destination);
+      o.start(t); o.stop(t + dur * 2);
+    });
+  } catch (e) { /* no audio – fine */ }
+}
+
+/* ================= Microphone: local "sch" detector =================
+   No speech recognition – just the spectrum:
+   - "sch": noisy, energy mostly ~1.7–5.5 kHz, little low-frequency voicing
+   - "s":   noisy, energy mostly above 6 kHz
+   - voiced sounds (l, w, b, k + vowel…): energy below 1 kHz dominates            */
+const Mic = {
+  ok: false, an: null, buf: null, binHz: 0, floor: null, handler: null, raf: 0,
+
+  async init() {
+    if (this.ok) return true;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false }
+      });
+      const ctx = audio();
+      this.an = ctx.createAnalyser();
+      this.an.fftSize = 1024;
+      this.an.smoothingTimeConstant = 0.3;
+      ctx.createMediaStreamSource(stream).connect(this.an);
+      this.buf = new Float32Array(this.an.frequencyBinCount);
+      this.binHz = ctx.sampleRate / this.an.fftSize;
+      this.ok = true;
+      await this.calibrate();
+    } catch (e) { this.ok = false; }
+    return this.ok;
+  },
+
+  bands() {
+    this.an.getFloatFrequencyData(this.buf);
+    const sum = (lo, hi) => {
+      let s = 0;
+      const a = Math.floor(lo / this.binHz), b = Math.min(this.buf.length - 1, Math.ceil(hi / this.binHz));
+      for (let i = a; i <= b; i++) s += Math.pow(10, this.buf[i] / 10);
+      return s;
+    };
+    return { low: sum(100, 900), mid: sum(1700, 5500), high: sum(6000, 11000) };
+  },
+
+  async calibrate() {
+    const acc = { low: 0, mid: 0, high: 0 }, n = 25;
+    for (let i = 0; i < n; i++) {
+      await wait(20);
+      const b = this.bands();
+      for (const k in acc) acc[k] += b[k] / n;
+    }
+    for (const k in acc) acc[k] = Math.max(acc[k], 1e-9);
+    this.floor = acc;
+  },
+
+  analyse() {
+    const b = this.bands(), f = this.floor;
+    const loud = b.low > f.low * 8 || b.mid > f.mid * 8 || b.high > f.high * 8;
+    const low = Math.max(0, b.low - f.low * 2), mid = Math.max(0, b.mid - f.mid * 2), high = Math.max(0, b.high - f.high * 2);
+    const sch = loud && mid > 2.5 * low && mid > 0.6 * high;
+    const s = loud && !sch && high > 1.6 * mid && high > 2 * low;
+    if (!loud) for (const k in f) f[k] = Math.max(1e-9, f[k] * 0.995 + b[k] * 0.005);  // follow room noise slowly
+    const level = Math.min(1, Math.max(0, Math.log10((b.low + b.mid + b.high) / (f.low + f.mid + f.high)) / 3));
+    return { loud, sch, s, level };
+  },
+
+  start(handler) {
+    this.stop();
+    this.handler = handler;
+    let last = performance.now();
+    const loop = (t) => {
+      if (this.handler !== handler) return;
+      const dt = Math.min(100, t - last); last = t;
+      handler(this.analyse(), dt, t);
+      if (this.handler === handler) this.raf = requestAnimationFrame(loop);
+    };
+    this.raf = requestAnimationFrame(loop);
+  },
+
+  stop() { cancelAnimationFrame(this.raf); this.handler = null; }
+};
+
+/* ---------- listening sessions ---------- */
+let listener = null;
+
+function activeMic() { return document.querySelector('.screen.active .mic'); }
+
+function beginListen(l) {
+  listener = l;
+  document.body.classList.add('listen');
+  const m = activeMic(); if (m) m.classList.add('listening');
+}
+
+function endListen(value) {
+  if (!listener) return;
+  const l = listener; listener = null;
+  Mic.stop();
+  clearTimeout(l.timer); clearInterval(l.iv);
+  document.body.classList.remove('listen');
+  document.querySelectorAll('.mic').forEach((m) => { m.classList.remove('listening', 'hearsch'); m.style.setProperty('--lvl', 0); });
+  l.resolve(value);
+}
+
+let lastMicFly = 0;
+function meter(r, t) {
+  const m = activeMic(); if (!m) return;
+  m.style.setProperty('--lvl', r.level.toFixed(2));
+  m.classList.toggle('hearsch', r.sch);
+  if (r.sch && t - lastMicFly > 250) { lastMicFly = t; schFly(m); }
+}
+
+/* Listen for one spoken word; resolves 'sch' | 's' | 'other' | 'timeout' | 'replay' | 'nomic' */
+function listenWord(timeout = 9000) {
+  return new Promise((resolve) => {
+    beginListen({ resolve, kind: 'word' });
+    if (!Mic.ok) { listener.timer = setTimeout(() => endListen('nomic'), 7000); return; }
+    let state = 'wait', t0 = null, onsetT = 0, nl = 0, sc = 0, ss = 0, quiet = 0, verdict = 'other';
+    Mic.start((r, dt, t) => {
+      if (t0 === null) t0 = t;
+      meter(r, t);
+      if (state === 'wait') {
+        if (r.loud) { state = 'onset'; onsetT = t; nl = sc = ss = 0; }
+        else if (t - t0 > timeout) return endListen('timeout');
+      }
+      if (state === 'onset') {
+        // only the first ~quarter second decides: does the word START with sch?
+        if (r.loud) nl++;
+        if (r.sch) sc++;
+        if (r.s) ss++;
+        if (t - onsetT > 240) {
+          if (nl < 5) { state = 'wait'; return; }               // just a click or bump
+          verdict = sc >= 3 && sc >= ss ? 'sch' : ss >= 3 ? 's' : 'other';
+          state = 'tail'; quiet = 0;
+        }
+      } else if (state === 'tail') {
+        quiet = r.loud ? 0 : quiet + dt;
+        if (quiet > 350 || t - onsetT > 3000) endListen(verdict);
+      }
+    });
+  });
+}
+
+/* Hiss race: progress grows while the child makes a "schhh" sound */
+function listenHiss(need, onProg) {
+  return new Promise((resolve) => {
+    let acc = 0;
+    const prog = (v) => { acc = v; onProg(Math.min(1, acc / need)); if (acc >= need) endListen(true); };
+    beginListen({ resolve, kind: 'hiss', onParent: () => prog(need) });
+    const runner = $('#runner');
+    if (!Mic.ok) {
+      runner.classList.add('go');
+      listener.iv = setInterval(() => prog(acc + need / 30), 160);
+      return;
+    }
+    let sTime = 0, idle = 0, tipped = false, paused = false, lastFly = 0;
+    Mic.start(async (r, dt, t) => {
+      if (paused) return;
+      meter(r, t);
+      runner.classList.toggle('go', r.sch || r.s);
+      if (r.sch) {
+        idle = 0;
+        if (t - lastFly > 200) { lastFly = t; schFly(runner); }
+        prog(acc + dt);
+      } else if (r.s) {
+        idle = 0; sTime += dt;
+        prog(acc + dt * 0.3);          // an "s" still helps a little, so nobody gets stuck
+      } else {
+        idle += dt;
+      }
+      if (!listener) return;
+      const tip = sTime > 2500 && !tipped;
+      if (tip || idle > 9000) {
+        if (tip) tipped = true;
+        idle = 0; paused = true;
+        runner.classList.remove('go');
+        await speak(tip ? 'Mach einen Kussmund, so:' : 'Mach mit! So:');
+        await hiss(1200);
+        await wait(250);
+        paused = false;
+      }
+    });
+  });
+}
+
+/* Parent override: hold 👍 for 0.7 s */
+(() => {
+  const b = $('#parentOk'); let timer = null;
+  const cancel = () => { clearTimeout(timer); b.classList.remove('holding'); };
+  b.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); b.classList.add('holding');
+    timer = setTimeout(() => {
+      cancel();
+      if (!listener) return;
+      if (listener.onParent) listener.onParent(); else endListen('sch');
+    }, 700);
+  });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => b.addEventListener(ev, cancel));
+})();
+
+/* ---------- effects ---------- */
+function schFly(el) {
+  const r = el.getBoundingClientRect();
+  const s = document.createElement('div');
+  s.className = 'schfly';
+  s.textContent = rand(['sch', 'schh', 'sch']);
+  const isSnake = el.matches('.runner, [data-mascot]');
+  s.style.left = (r.left + r.width * (isSnake ? 0.9 : 0.5)) + 'px';
+  s.style.top = (r.top + r.height * (isSnake ? 0.45 : 0.3)) + 'px';
+  s.style.setProperty('--dx', (Math.random() * 60 - 10) + 'px');
+  document.body.appendChild(s);
+  setTimeout(() => s.remove(), 1000);
+}
+
+function sparkle(el) {
+  const r = el.getBoundingClientRect();
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  for (let i = 0; i < 12; i++) {
+    const s = document.createElement('div');
+    s.className = 'spark';
+    s.textContent = rand(['★', '✦', '♥']);
+    s.style.color = rand(['#ffca28', '#ff7043', '#ec407a', '#66bb6a', '#42a5f5']);
+    const a = (i / 12) * Math.PI * 2, d = r.width * 0.6 + Math.random() * 40;
+    s.style.left = cx + 'px'; s.style.top = cy + 'px';
+    s.style.setProperty('--dx', Math.cos(a) * d + 'px');
+    s.style.setProperty('--dy', Math.sin(a) * d + 'px');
+    document.body.appendChild(s);
+    setTimeout(() => s.remove(), 1000);
+  }
+}
+
+function confetti(n = 80) {
+  const colors = ['#ef5350', '#ffca28', '#66bb6a', '#42a5f5', '#ab47bc', '#ff7043', '#ec407a'];
+  for (let i = 0; i < n; i++) {
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    c.style.left = Math.random() * 100 + 'vw';
+    c.style.background = rand(colors);
+    c.style.borderRadius = Math.random() < 0.4 ? '50%' : '3px';
+    c.style.setProperty('--r', (Math.random() * 1080 - 540) + 'deg');
+    const dur = 2 + Math.random() * 2;
+    c.style.animationDuration = dur + 's';
+    c.style.animationDelay = Math.random() * 0.8 + 's';
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), (dur + 1) * 1000);
+  }
+}
+
+/* ================= Game ================= */
+const cards = [...document.querySelectorAll('#game .card')];
+let order = [], pi = 0, step = 0, askOrder = [], target = null, busy = true, solved = 0, advancing = false;
+
+function renderProgress(popIndex = -1) {
+  $('#progress').innerHTML = order.map((_, i) => STAR(i < solved)).join('');
+  $('#progress').querySelectorAll('svg').forEach((s, i) => { if (i !== popIndex) s.classList.remove('on'); });
+}
+
+async function newGame() {
+  $('#playBtn').disabled = $('#againBtn').disabled = true;
+  audio();
+  await Mic.init();
+  document.body.classList.toggle('nomic', !Mic.ok);
+  $('#playBtn').disabled = $('#againBtn').disabled = false;
+
+  order = shuffle(PAIRS.map((_, i) => i)).slice(0, ROUNDS);
+  pi = 0; solved = 0;
+  renderProgress();
+  await hissRound(true);
+  startPair();
+}
+
+/* --- 1. hiss race: just the sound --- */
+async function hissRound(first) {
+  const runner = $('#runner');
+  const setP = (p) => runner.style.setProperty('--p', p.toFixed(3));
+  setP(0);
+  runner.classList.remove('go');
+  $('#goal').classList.remove('eaten');
+  show('hiss');
+  await speak(first
+    ? 'Hallo! Ich bin Schlangi. Ich habe Hunger! Hilf mir zum Apfel. Mach ganz lange so:'
+    : 'Schlangi hat schon wieder Hunger! Mach ganz lange so:');
+  await hiss(1500);
+  await wait(200);
+  await listenHiss(2600, setP);
+  runner.classList.remove('go');
+  $('#goal').classList.add('eaten');
+  wiggle(runner);
+  tones([523, 659, 784, 1047], 0.12);
+  confetti(60);
+  await speak('Mmh, lecker! Danke!');
+  await wait(300);
+}
+
+/* --- 2. listen: pick the right picture --- */
+function startPair() {
+  step = 0;
+  askOrder = shuffle([0, 1]);
+  show('game');
+  ask();
+}
+
+const question = () => `Wo ist ${target.art} ${target.name}?`;
+
+function ask() {
+  const pair = PAIRS[order[pi]];
+  target = pair[askOrder[step]];
+  const sides = shuffle([0, 1]);
+  cards.forEach((c, k) => {
+    const w = pair[sides[k]];
+    c.dataset.word = w.name;
+    c.querySelector('.pic').innerHTML = IMG[w.img];
+    c.querySelector('.cap').innerHTML = '';
+    c.className = 'card';
+    void c.offsetWidth;
+    c.classList.add('enter');
+  });
+  $('#hint').innerHTML = hl(target.name);
+  busy = true;
+  setTimeout(() => (busy = false), 500);
+  speak(question());
+}
+
+async function pick(card) {
+  if (busy) return;
+  const pair = PAIRS[order[pi]];
+  const w = pair.find((x) => x.name === card.dataset.word);
+  card.querySelector('.cap').innerHTML = hl(w.name);
+  card.classList.remove('enter', 'right', 'wrong');
+  void card.offsetWidth;
+
+  if (w === target) {
+    busy = true;
+    card.classList.add('right');
+    sparkle(card);
+    tones([660, 880, 1320]);
+    wiggle($('#game [data-mascot]'));
+    await speak(`${rand(PRAISE)} ${cap(w.art)} ${w.name}!`);
+    step++;
+    if (step < 2) { await wait(300); ask(); return; }
+    await sayRound(pair[0]);
+    pairSolved(pair);
+  } else {
+    busy = true;
+    card.classList.add('wrong');
+    tones([330, 247], 0.13, 'triangle');
+    await speak(`Das ist ${w.art} ${w.name}. ${question()}`);
+    card.classList.remove('wrong');
+    card.querySelector('.cap').innerHTML = '';
+    busy = false;
+  }
+}
+
+/* --- 3. speak: say the sch word --- */
+async function modelWord(w, intro) {
+  await speak(intro);
+  await hiss(900);
+  await wait(80);
+  await speak(w.name + '!');
+  await wait(250);
+}
+
+async function sayRound(w) {
+  const card = $('#sayCard');
+  $('#sayPic').innerHTML = IMG[w.img];
+  $('#sayCap').innerHTML = hl(w.name);
+  card.className = 'card enter';
+  show('say');
+  await modelWord(w, 'Jetzt du! Sag es wie Schlangi:');
+  let tries = 0;
+  while (true) {
+    const r = await listenWord();
+    if (r === 'replay') { await modelWord(w, 'Hör mal:'); continue; }
+    if (r === 'sch' || r === 'nomic') {
+      card.className = 'card right';
+      sparkle(card);
+      tones([660, 880, 1320, 1760]);
+      wiggle($('#say [data-mascot]'));
+      await speak(r === 'sch' ? `${rand(PRAISE)} Ich habe dein Zischen gehört!` : rand(PRAISE));
+      return true;
+    }
+    tries++;
+    if (tries >= 3) { await speak('Gut geübt! Weiter geht es!'); return false; }
+    card.className = 'card';
+    if (r === 'timeout') await modelWord(w, 'Sag mal:');
+    else if (r === 's') await modelWord(w, 'Fast! Mach einen Kussmund, so:');
+    else await modelWord(w, 'Fast! Fang mit dem Zischen an, so:');
+  }
+}
+
+/* --- 4. celebrate --- */
+async function pairSolved(pair) {
+  solved++;
+  advancing = false;
+  $('#partyTitle').textContent = rand(PARTY_TITLES);
+  $('#partyPair').innerHTML = pair.map((w) => `<figure><div>${IMG[w.img]}</div>${hl(w.name)}</figure>`).join('');
+  const t = $('#partyTitle'); t.style.animation = 'none'; void t.offsetWidth; t.style.animation = '';
+  show('party');
+  confetti();
+  tones([523, 659, 784, 1047, 784, 1047], 0.12);
+  $('#nextBtn').style.visibility = 'hidden';
+  await speak(`Juhu! ${pair[0].name} und ${pair[1].name}!`);
+  $('#nextBtn').style.visibility = 'visible';
+}
+
+async function next() {
+  if (advancing) return;
+  advancing = true;
+  if (window.speechSynthesis) speechSynthesis.cancel();
+  pi++;
+  if (pi >= order.length) { finish(); return; }
+  renderProgress(solved - 1);
+  if (pi === BONUS_AFTER) await hissRound(false);
+  startPair();
+}
+
+function finish() {
+  $('#endStars').innerHTML = order.map(() => STAR(true)).join('');
+  show('end');
+  confetti(160);
+  setTimeout(() => confetti(120), 1500);
+  tones([523, 659, 784, 1047, 1319, 1568], 0.13);
+  speak('Hurra! Du bist ein Sch-Profi!').then(() => hiss(1200));
+}
+
+/* ================= Wiring ================= */
+cards.forEach((c) => c.addEventListener('click', () => pick(c)));
+$('#speaker').addEventListener('click', () => { if (target && !busy) speak(question()); });
+$('#sayCard').addEventListener('click', () => { if (listener && listener.kind === 'word') endListen('replay'); });
+$('#playBtn').addEventListener('click', newGame);
+$('#nextBtn').addEventListener('click', next);
+$('#againBtn').addEventListener('click', newGame);
+</script>
+</body>
+</html>
