@@ -1,0 +1,1117 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Fridolins F-Spiel</title>
+<style>
+  :root {
+    --sky1: #e1f5fe;
+    --sky2: #fffde7;
+    --ink: #3e2c23;
+    --card: #ffffff;
+    --good: #66bb6a;
+    --bad: #ef5350;
+    --f: #e65100;
+    --honey: #ffca28;
+    --honeyd: #f0a500;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: "Comic Sans MS", "Chalkboard SE", "Baloo 2", system-ui, sans-serif;
+    color: var(--ink);
+    background: linear-gradient(180deg, var(--sky1), var(--sky2) 75%, #e6f4c9);
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+  }
+  button { font: inherit; color: inherit; border: none; background: none; cursor: pointer; padding: 0; }
+  .f { color: var(--f); }
+
+  .screen { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 16px; gap: 14px; }
+  .screen.active { display: flex; }
+  .screen.withbar { padding-top: clamp(64px, 11vh, 84px); }
+
+  /* ---------- start ---------- */
+  h1 { margin: 0; font-size: clamp(32px, 7vw, 64px); text-align: center; }
+  .big-btn {
+    width: clamp(110px, 24vw, 160px); height: clamp(110px, 24vw, 160px);
+    border-radius: 50%; background: var(--good);
+    box-shadow: 0 8px 0 #388e3c, 0 12px 24px rgba(0,0,0,.2);
+    display: grid; place-items: center;
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  .big-btn:active { transform: translateY(6px); box-shadow: 0 2px 0 #388e3c; }
+  .big-btn:disabled { opacity: .5; animation: none; }
+  .big-btn svg { width: 55%; height: 55%; }
+  @keyframes pulse { 50% { transform: scale(1.08); } }
+  .parents { max-width: 560px; font-size: 14px; line-height: 1.4; text-align: center; opacity: .7; font-family: system-ui, sans-serif; }
+
+  /* ---------- Fridolin, the bumble-bee ---------- */
+  .mascot { width: clamp(150px, 30vw, 240px); cursor: pointer; }
+  .mascot svg { display: block; width: 100%; height: auto; overflow: visible; animation: hover 2.2s ease-in-out infinite; }
+  @keyframes hover { 50% { transform: translateY(-8px) rotate(-3deg); } }
+  .wing { transform-box: fill-box; transform-origin: 50% 100%; animation: flap .09s linear infinite alternate; }
+  @keyframes flap { to { transform: scaleY(.55); } }
+  .bee .o { display: none; }
+  .blowing .bee .o { display: inline; }
+  .blowing .bee .smile { display: none; }
+  .blowing svg { animation: buzzy .12s linear infinite alternate; }
+  @keyframes buzzy { from { transform: translate(-2px, 1px); } to { transform: translate(2px, -1px); } }
+  .mascot.wiggle svg { animation: wiggle .6s ease-in-out 2; }
+  @keyframes wiggle { 25% { transform: rotate(-10deg) translateY(-10px); } 75% { transform: rotate(10deg) translateY(-10px); } }
+
+  .flyer { position: fixed; left: 0; top: 0; width: 110px; z-index: 25; pointer-events: none; }
+  .flyer svg { display: block; width: 100%; height: auto; overflow: visible; }
+
+  /* ---------- honeycomb progress ---------- */
+  .progress { position: fixed; top: 10px; left: 0; right: 0; display: none; gap: 4px; justify-content: center; z-index: 5; }
+  body.bar .progress { display: flex; }
+  .progress svg { width: clamp(34px, 7.5vw, 52px); height: clamp(34px, 7.5vw, 52px); }
+  .progress .on { animation: honeypop .8s cubic-bezier(.3,1.8,.5,1); }
+  @keyframes honeypop { 0% { transform: scale(0) rotate(-120deg); } 100% { transform: scale(1) rotate(0); } }
+
+  /* ---------- memory board ---------- */
+  #boardBee { position: absolute; top: 4px; left: 8px; width: clamp(64px, 12vw, 92px); }
+  .grid { display: grid; gap: var(--gap, 12px); grid-template-columns: repeat(var(--cols, 4), var(--cs, 120px)); }
+  .card { position: relative; width: var(--cs, 120px); height: calc(var(--cs, 120px) * 1.12); }
+  .card .deal { width: 100%; height: 100%; perspective: 900px; animation: popin .5s cubic-bezier(.3,1.6,.5,1) both; }
+  .card .inner { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform .55s cubic-bezier(.3,1.4,.5,1); }
+  .card.up .inner { transform: rotateY(180deg); }
+  .face {
+    position: absolute; inset: 0; border-radius: calc(var(--cs, 120px) * .14);
+    backface-visibility: hidden; -webkit-backface-visibility: hidden;
+    box-shadow: 0 6px 0 rgba(0,0,0,.08), 0 10px 20px rgba(0,0,0,.1);
+  }
+  .face.back {
+    border: 5px solid #fff; display: grid; place-items: center;
+    background: #ffd54f url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='52'%3E%3Cpath d='M0 8.66 L15 0 L30 8.66 M0 8.66 V25.98 M30 8.66 V25.98 M0 25.98 L15 34.64 L30 25.98 M15 34.64 V52' fill='none' stroke='%23f0b400' stroke-width='2'/%3E%3C/svg%3E");
+  }
+  .face.back svg { width: 46%; animation: spin 9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .face.front {
+    transform: rotateY(180deg); background: var(--card); border: 5px solid #ffe082;
+    display: flex; flex-direction: column; align-items: center; padding: 7% 6% 3%;
+    transition: border-color .3s, background .3s;
+  }
+  .face.front .pic { flex: 1; width: 100%; min-height: 0; }
+  .face.front .pic svg { width: 100%; height: 100%; display: block; }
+  .face.front .cap { font-weight: bold; font-size: calc(var(--cs, 120px) * .13); line-height: 1.25; white-space: nowrap; }
+  .card.match { animation: hop .6s ease; }
+  .card.nope { animation: shake .5s ease; }
+  .card.done { cursor: default; }
+  .card.done .face.front { border-color: var(--good); background: #f1f8e9; }
+  .card.done::after {
+    content: ''; position: absolute; top: -9%; right: -9%; width: 34%; height: 34%; z-index: 2;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 6 L62 37 L95 38 L69 59 L78 92 L50 73 L22 92 L31 59 L5 38 L38 37 Z' fill='%23ffca28' stroke='%23f9a825' stroke-width='5' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+    animation: honeypop .8s cubic-bezier(.3,1.8,.5,1);
+  }
+  @keyframes popin { from { transform: scale(0); } to { transform: scale(1); } }
+  @keyframes hop { 30% { transform: translateY(-24px) scale(1.06); } 60% { transform: translateY(0) scale(.97); } }
+  @keyframes shake { 20%, 60% { transform: translateX(-10px) rotate(-3deg); } 40%, 80% { transform: translateX(10px) rotate(3deg); } }
+
+  /* ---------- speak ---------- */
+  .say-title { font-size: clamp(28px, 6vw, 48px); font-weight: bold; text-align: center; }
+  .say-row { display: flex; align-items: center; gap: clamp(8px, 3vw, 30px); }
+  .say-row .mascot { width: clamp(100px, 20vw, 170px); }
+  .bigcard {
+    position: relative; width: min(46vw, 40vh, 300px); aspect-ratio: 1;
+    background: var(--card); border-radius: 32px;
+    box-shadow: 0 8px 0 #cfd8dc, 0 14px 28px rgba(0,0,0,.12);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    border: 6px solid transparent; transition: border-color .2s;
+  }
+  .bigcard .pic { width: 80%; height: 80%; }
+  .bigcard .pic svg { width: 100%; height: 100%; display: block; }
+  .bigcard .cap { position: absolute; bottom: -1.5em; font-size: clamp(22px, 4.5vw, 34px); font-weight: bold; white-space: nowrap; }
+  .bigcard.enter { animation: popin .5s cubic-bezier(.3,1.6,.5,1) both; }
+  .bigcard.right { border-color: var(--good); animation: hop .6s ease; }
+
+  .mic {
+    position: relative; width: clamp(80px, 16vw, 110px); height: clamp(80px, 16vw, 110px);
+    border-radius: 50%; background: #b0bec5; color: #b0bec5;
+    display: grid; place-items: center; --lvl: 0;
+    transition: background .15s, color .15s;
+  }
+  .mic svg { width: 55%; position: relative; }
+  .mic .ring { position: absolute; inset: 0; border-radius: 50%; background: currentColor; opacity: .35; transform: scale(calc(1 + var(--lvl) * .9)); transition: transform .08s; }
+  .mic.listening { background: #42a5f5; color: #42a5f5; animation: pulse 1.6s ease-in-out infinite; }
+  .mic.hearf { background: #ff7043; color: #ff7043; }
+  .micnote { display: none; font-size: 14px; opacity: .7; font-family: system-ui, sans-serif; text-align: center; }
+  body.nomic .micnote { display: block; }
+
+  .ffly { position: fixed; pointer-events: none; z-index: 20; font-weight: bold; font-size: 26px; color: #4fc3f7; animation: ffly 1s ease-out forwards; }
+  @keyframes ffly { from { transform: translate(-50%, -50%) scale(.6); opacity: 1; } to { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.3); opacity: 0; } }
+
+  /* ---------- blow race ---------- */
+  .track {
+    position: relative; width: min(94vw, 760px); height: clamp(150px, 32vh, 250px);
+    background: linear-gradient(transparent 80%, #9ccc65 80%);
+    border-radius: 24px;
+  }
+  .runner { --w: clamp(100px, 22vw, 170px); position: absolute; bottom: 26%; width: var(--w); left: calc((100% - var(--w) * 1.25) * var(--p, 0)); transition: left .15s linear; cursor: default; }
+  .goal { position: absolute; right: 1%; bottom: 4%; width: clamp(60px, 12vw, 100px); transform-origin: 50% 100%; }
+  .goal .petals { transform-box: fill-box; transform-origin: center; transition: transform .6s cubic-bezier(.3,1.8,.5,1); transform: scale(.55); }
+  .goal.bloom .petals { transform: scale(1.1); }
+  .goal.bloom { animation: hop .7s ease 2; }
+
+  /* ---------- parent override ---------- */
+  #parentOk {
+    position: fixed; right: 12px; bottom: 12px; z-index: 40; display: none;
+    width: 58px; height: 58px; border-radius: 50%; background: #fff;
+    box-shadow: 0 4px 12px rgba(0,0,0,.15); font-size: 28px; opacity: .6;
+    transition: transform .7s, background .7s, opacity .2s;
+  }
+  body.listen #parentOk { display: grid; place-items: center; }
+  #parentOk.holding { transform: scale(1.35); background: #a5d6a7; opacity: 1; }
+
+  .spark { position: fixed; pointer-events: none; font-size: 32px; z-index: 30; animation: spark .9s ease-out forwards; }
+  @keyframes spark { from { transform: translate(-50%, -50%) scale(.4); opacity: 1; } to { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.2) rotate(180deg); opacity: 0; } }
+
+  /* ---------- celebration ---------- */
+  #party { background: rgba(255,253,231,.9); z-index: 10; }
+  #party .title { font-size: clamp(44px, 10vw, 90px); font-weight: bold; color: #ff7043; text-shadow: 0 4px 0 #ffccbc; animation: grow .7s cubic-bezier(.3,1.8,.5,1); }
+  @keyframes grow { from { transform: scale(0) rotate(-20deg); } to { transform: scale(1); } }
+  #party .mascot svg, #end .mascot svg { animation: dance .8s ease-in-out infinite; transform-origin: 50% 90%; }
+  @keyframes dance { 0%, 100% { transform: rotate(-10deg) scale(1); } 50% { transform: rotate(10deg) scale(1.12) translateY(-16px); } }
+  #party .bigcard { width: min(40vw, 32vh, 240px); margin-bottom: 1.4em; }
+  #party .party-row { display: flex; align-items: center; gap: clamp(8px, 4vw, 40px); }
+  #party .mascot { width: clamp(110px, 22vw, 180px); }
+
+  .confetti { position: fixed; top: -20px; width: 12px; height: 18px; z-index: 30; pointer-events: none; animation: fall linear forwards; }
+  @keyframes fall { to { transform: translateY(110vh) rotate(var(--r)); } }
+
+  #end .stickers { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: 720px; }
+  #end .stickers button {
+    width: clamp(64px, 14vw, 104px); aspect-ratio: 1; background: #fff; border-radius: 20px; padding: 8px;
+    box-shadow: 0 5px 0 #cfd8dc; animation: popin .5s cubic-bezier(.3,1.6,.5,1) both;
+  }
+  #end .stickers button:active { transform: translateY(4px); }
+  #end .stickers svg { width: 100%; height: 100%; display: block; }
+  #end .hint { font-size: clamp(16px, 3vw, 22px); opacity: .6; text-align: center; }
+
+  @media (max-height: 520px) {
+    .say-row .mascot, #party .mascot { width: 80px; }
+    #party .title { font-size: 40px; }
+    .say-title { font-size: 24px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="progress" id="progress"></div>
+<button id="parentOk" aria-label="Eltern: F war gut">👍</button>
+
+<!-- START -->
+<section id="start" class="screen active">
+  <div class="mascot" data-mascot></div>
+  <h1><span class="f">F</span>ridolins <span class="f">F</span>-Spiel</h1>
+  <button class="big-btn" id="playBtn" aria-label="Spielen">
+    <svg viewBox="0 0 100 100"><path d="M30 18 L84 50 L30 82 Z" fill="#fff" stroke="#fff" stroke-width="8" stroke-linejoin="round"/></svg>
+  </button>
+  <p class="parents">
+    Für Eltern: Bei Wörtern wie „Flasche“ oder „Pflaume“ verschlucken Kinder oft den ersten Laut („lasche“).
+    Hier sucht Ihr Kind Bilderpaare. Nach jedem Paar spricht Hummel Fridolin das Wort mit langem „Fff“ vor,
+    dann ist Ihr Kind dran. Das Spiel hört über das Mikrofon, ob das Wort mit dem Puste-Laut beginnt –
+    die Auswertung passiert nur hier im Browser, es wird nichts aufgenommen oder gesendet.
+    Klang das F gut, wurde aber nicht erkannt? Den 👍-Knopf unten rechts kurz gedrückt halten.
+  </p>
+</section>
+
+<!-- BLOW RACE -->
+<section id="blow" class="screen withbar">
+  <div class="say-title">Puste Fridolin zur Blume!</div>
+  <div class="track">
+    <div class="runner mascot" id="runner"></div>
+    <div class="goal" id="goal"></div>
+  </div>
+  <div class="mic"><div class="ring"></div><svg viewBox="0 0 100 100"><use href="#micIcon"/></svg></div>
+  <div class="micnote">Kein Mikrofon – Fridolin fliegt von allein. Einfach mitpusten: Fffff!</div>
+</section>
+
+<!-- MEMORY -->
+<section id="board" class="screen withbar">
+  <div class="mascot" id="boardBee" data-mascot></div>
+  <div class="grid" id="grid"></div>
+</section>
+
+<!-- SPEAK -->
+<section id="say" class="screen withbar">
+  <div class="say-title">Jetzt du!</div>
+  <div class="say-row">
+    <div class="mascot" data-mascot></div>
+    <button class="bigcard" id="sayCard" aria-label="Nochmal hören"><div class="pic" id="sayPic"></div><div class="cap" id="sayCap"></div></button>
+  </div>
+  <div style="height:1.4em"></div>
+  <div class="mic"><div class="ring"></div><svg viewBox="0 0 100 100"><use href="#micIcon"/></svg></div>
+  <div class="micnote">Kein Mikrofon – Eltern: 👍 gedrückt halten, wenn das F gut klang.</div>
+</section>
+
+<!-- PAIR SOLVED -->
+<section id="party" class="screen">
+  <div class="title" id="partyTitle">Super!</div>
+  <div class="party-row">
+    <div class="mascot" data-mascot></div>
+    <div class="bigcard right" id="partyCard"><div class="pic" id="partyPic"></div><div class="cap" id="partyCap"></div></div>
+  </div>
+</section>
+
+<!-- END -->
+<section id="end" class="screen">
+  <h1>Du bist ein <span class="f">F</span>-Profi!</h1>
+  <div class="mascot" data-mascot></div>
+  <div class="stickers" id="stickers"></div>
+  <div class="hint">Tipp auf ein Bild und sag es nochmal!</div>
+  <button class="big-btn" id="againBtn" aria-label="Nochmal spielen">
+    <svg viewBox="0 0 100 100"><path d="M78 50 A28 28 0 1 1 64 26" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round"/><path d="M56 10 L74 26 L52 36 Z" fill="#fff" stroke="#fff" stroke-width="6" stroke-linejoin="round"/></svg>
+  </button>
+</section>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="micIcon" viewBox="0 0 100 100">
+    <rect x="36" y="10" width="28" height="50" rx="14" fill="#fff"/>
+    <path d="M24 44 Q24 72 50 72 Q76 72 76 44" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+    <path d="M50 72 V86 M36 88 H64" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+  </symbol>
+</svg>
+
+<script>
+/* ================= SVG pictures ================= */
+const IMG = {
+  flasche: `<svg viewBox="0 0 100 100">
+    <rect x="41" y="5" width="18" height="12" rx="3" fill="#c08a5a" stroke="#8a5a32" stroke-width="2"/>
+    <path d="M42 17h16v15q0 6 10 14q6 5 6 14v26q0 8-8 8H34q-8 0-8-8V60q0-9 6-14q10-8 10-14z" fill="#d6f2ff" stroke="#3a8fc0" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M28 70h44v16q0 6-6 6H34q-6 0-6-6z" fill="#5cc0f0" opacity=".8"/>
+    <rect x="33" y="50" width="34" height="18" rx="4" fill="#fff" stroke="#3a8fc0" stroke-width="2"/>
+    <path d="M50 64c-6-4-8-7-6-9.5c1.5-2 4.5-1.5 6 .8c1.5-2.3 4.5-2.8 6-.8c2 2.5 0 5.5-6 9.5z" fill="#ff6b8a"/>
+    <path d="M32 74q-1 6 0 12" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round" opacity=".8"/>
+  </svg>`,
+
+  flugzeug: `<svg viewBox="0 0 100 100">
+    <g fill="#e1f5fe"><circle cx="18" cy="22" r="7"/><circle cx="27" cy="19" r="9"/><circle cx="36" cy="23" r="6"/><circle cx="74" cy="84" r="6"/><circle cx="82" cy="81" r="8"/><circle cx="90" cy="85" r="5"/></g>
+    <path d="M50 46 L42 26 h9 L66 46z" fill="#c0392b"/>
+    <path d="M14 52 L8 28 h10 L32 48z" fill="#e74c3c" stroke="#a93226" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M12 50 Q12 42 24 42 H78 Q94 42 96 52 Q94 62 78 62 H24 Q12 62 12 54z" fill="#fff" stroke="#4a6d8c" stroke-width="3"/>
+    <path d="M82 45 Q90 46 93 51 H84z" fill="#7fd3f0"/>
+    <g fill="#7fd3f0"><circle cx="32" cy="51" r="3.2"/><circle cx="42" cy="51" r="3.2"/><circle cx="52" cy="51" r="3.2"/><circle cx="62" cy="51" r="3.2"/><circle cx="72" cy="51" r="3.2"/></g>
+    <path d="M46 56 L34 84 h11 L66 56z" fill="#e74c3c" stroke="#a93226" stroke-width="2" stroke-linejoin="round"/>
+  </svg>`,
+
+  fliege: `<svg viewBox="0 0 100 100">
+    <g fill="#d9f1ff" stroke="#8cc6e6" stroke-width="2" opacity=".95"><ellipse cx="30" cy="48" rx="20" ry="11" transform="rotate(-35 30 48)"/><ellipse cx="70" cy="48" rx="20" ry="11" transform="rotate(35 70 48)"/></g>
+    <g stroke="#333" stroke-width="3" stroke-linecap="round" fill="none"><path d="M40 62l-12 6l-4 8"/><path d="M60 62l12 6l4 8"/><path d="M42 72l-8 10"/><path d="M58 72l8 10"/></g>
+    <ellipse cx="50" cy="64" rx="14" ry="20" fill="#3d3d4d"/>
+    <path d="M37.5 60h25M37.5 68h25M39.5 76h21" stroke="#5c5c70" stroke-width="3"/>
+    <circle cx="50" cy="38" r="14" fill="#4a4a5c"/>
+    <circle cx="41" cy="34" r="8" fill="#d63031"/><circle cx="59" cy="34" r="8" fill="#d63031"/>
+    <circle cx="43" cy="32" r="2.5" fill="#fff"/><circle cx="61" cy="32" r="2.5" fill="#fff"/>
+    <path d="M44 45q6 5 12 0" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  </svg>`,
+
+  flamme: `<svg viewBox="0 0 100 100">
+    <path d="M50 6C58 24 80 38 78 64C76 84 64 94 50 94C36 94 24 84 22 64C21 48 32 40 36 26C40 34 44 36 46 38C46 26 46 16 50 6Z" fill="#ff7a1a"/>
+    <path d="M50 34C58 48 68 58 66 72C64 84 58 90 50 90C42 90 36 84 34 72C33 62 42 52 50 34Z" fill="#ffd23f"/>
+    <circle cx="44" cy="70" r="3" fill="#5d3a1a"/><circle cx="56" cy="70" r="3" fill="#5d3a1a"/>
+    <ellipse cx="39" cy="77" rx="3.5" ry="2.2" fill="#ff8a65" opacity=".8"/><ellipse cx="61" cy="77" rx="3.5" ry="2.2" fill="#ff8a65" opacity=".8"/>
+    <path d="M45 78 Q50 83 55 78" fill="none" stroke="#5d3a1a" stroke-width="2.5" stroke-linecap="round"/>
+  </svg>`,
+
+  floete: `<svg viewBox="0 0 100 100">
+    <g transform="rotate(35 50 50)">
+      <path d="M43 6h14v14l-1 4v62l4 8H40l4-8V24l-1-4z" fill="#f6e3c3" stroke="#a0703c" stroke-width="2.5" stroke-linejoin="round"/>
+      <path d="M43 6h14v12H43z" fill="#c48a52"/>
+      <rect x="46" y="26" width="8" height="4" rx="1" fill="#6b4a2b"/>
+      <g fill="#6b4a2b"><circle cx="50" cy="40" r="2.6"/><circle cx="50" cy="50" r="2.6"/><circle cx="50" cy="60" r="2.6"/><circle cx="50" cy="70" r="2.6"/><circle cx="50" cy="80" r="2.4"/></g>
+    </g>
+    <g fill="#7b5cd6">
+      <ellipse cx="18" cy="40" rx="6" ry="4.5" transform="rotate(-20 18 40)"/><rect x="22" y="16" width="3" height="24"/><path d="M25 16q8 2 10 10q-4-4-10-4z"/>
+      <ellipse cx="80" cy="72" rx="5" ry="4" transform="rotate(-20 80 72)"/><rect x="83.5" y="54" width="2.6" height="18"/>
+    </g>
+  </svg>`,
+
+  flagge: `<svg viewBox="0 0 100 100">
+    <path d="M10 94q40-10 80 0z" fill="#8fd16a"/>
+    <rect x="20" y="10" width="5" height="84" rx="2" fill="#8b5a2b"/>
+    <circle cx="22.5" cy="9" r="5" fill="#ffc928"/>
+    <path d="M25 16C38 9 50 22 64 16S82 10 88 14V50C82 46 74 46 64 52S38 46 25 52Z" fill="#ff5a5f" stroke="#c0392b" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M55 22l3.2 6.5 7.2 1-5.2 5 1.2 7.1-6.4-3.4-6.4 3.4 1.2-7.1-5.2-5 7.2-1z" fill="#fff"/>
+  </svg>`,
+
+  fledermaus: `<svg viewBox="0 0 100 100">
+    <path d="M40 50C30 36 14 34 4 42c6 4 7 10 4 16c7-2 12 2 13 8c6-4 12-2 15 4z" fill="#5b4b8a" stroke="#3e3266" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M60 50c10-14 26-16 36-8c-6 4-7 10-4 16c-7-2-12 2-13 8c-6-4-12-2-15 4z" fill="#5b4b8a" stroke="#3e3266" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M38 36 L36 17 L49 29z M62 36 L64 17 L51 29z" fill="#6b5a9e"/>
+    <ellipse cx="50" cy="63" rx="15" ry="18" fill="#6b5a9e"/>
+    <ellipse cx="50" cy="67" rx="9" ry="11" fill="#8d7cc0"/>
+    <circle cx="50" cy="40" r="15" fill="#6b5a9e"/>
+    <circle cx="44" cy="38" r="5" fill="#fff"/><circle cx="56" cy="38" r="5" fill="#fff"/>
+    <circle cx="44.5" cy="39" r="2.8" fill="#222"/><circle cx="56.5" cy="39" r="2.8" fill="#222"/>
+    <ellipse cx="39" cy="46" rx="3" ry="2" fill="#f48fb1" opacity=".8"/><ellipse cx="61" cy="46" rx="3" ry="2" fill="#f48fb1" opacity=".8"/>
+    <path d="M45 46.5q5 4 10 0" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+    <path d="M46.5 47.8l1.3 3 1.3-2.4z M50.9 48.4l1.3 2.4 1.3-3z" fill="#fff"/>
+  </svg>`,
+
+  fliegenpilz: `<svg viewBox="0 0 100 100">
+    <path d="M8 94q42-12 84 0z" fill="#8fd16a"/>
+    <path d="M38 54L35 88Q50 96 65 88L62 54z" fill="#fff6e6" stroke="#d9c2a0" stroke-width="2.5" stroke-linejoin="round"/>
+    <circle cx="45" cy="72" r="2.6" fill="#5d3a1a"/><circle cx="55" cy="72" r="2.6" fill="#5d3a1a"/>
+    <path d="M46 79 q4 3 8 0" fill="none" stroke="#5d3a1a" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M10 58C10 22 90 22 90 58Q50 66 10 58z" fill="#e53935" stroke="#b71c1c" stroke-width="2.5" stroke-linejoin="round"/>
+    <g fill="#fff"><circle cx="30" cy="42" r="5"/><circle cx="50" cy="34" r="6"/><circle cx="70" cy="42" r="5"/><circle cx="41" cy="52" r="3.5"/><circle cx="61" cy="52" r="4"/><circle cx="19" cy="53" r="3"/><circle cx="81" cy="53" r="3"/></g>
+  </svg>`,
+
+  flamingo: `<svg viewBox="0 0 100 100">
+    <g stroke="#e86a92" stroke-width="3.5" stroke-linecap="round" fill="none"><path d="M44 62V94"/><path d="M50 62V78L60 72"/></g>
+    <path d="M28 50L16 45L22 58z" fill="#ff7aa2"/>
+    <ellipse cx="46" cy="54" rx="20" ry="12" fill="#ff8fb1"/>
+    <ellipse cx="43" cy="53" rx="11" ry="7" fill="#ff6f9c" transform="rotate(-10 43 53)"/>
+    <path d="M60 48C72 40 72 30 62 26C54 22 56 10 66 12" stroke="#ff8fb1" stroke-width="7" fill="none" stroke-linecap="round"/>
+    <circle cx="67" cy="14" r="7" fill="#ff8fb1"/>
+    <path d="M73 12L84 16Q82 22 76 22L72 18z" fill="#fff"/>
+    <path d="M80 15L84 16Q83 21 79 21z" fill="#333"/>
+    <circle cx="68" cy="12" r="1.8" fill="#333"/>
+  </svg>`,
+
+  frosch: `<svg viewBox="0 0 100 100">
+    <circle cx="31" cy="36" r="14" fill="#5cbf4a"/><circle cx="69" cy="36" r="14" fill="#5cbf4a"/>
+    <ellipse cx="50" cy="64" rx="38" ry="28" fill="#5cbf4a"/>
+    <ellipse cx="50" cy="74" rx="24" ry="15" fill="#b8e68f"/>
+    <circle cx="31" cy="35" r="9" fill="#fff"/><circle cx="69" cy="35" r="9" fill="#fff"/>
+    <circle cx="33" cy="36" r="5" fill="#2d2d2d"/><circle cx="71" cy="36" r="5" fill="#2d2d2d"/>
+    <circle cx="34.5" cy="34" r="1.8" fill="#fff"/><circle cx="72.5" cy="34" r="1.8" fill="#fff"/>
+    <circle cx="45" cy="52" r="1.5" fill="#2f6b25"/><circle cx="55" cy="52" r="1.5" fill="#2f6b25"/>
+    <ellipse cx="24" cy="60" rx="5" ry="3" fill="#ff9aa2"/><ellipse cx="76" cy="60" rx="5" ry="3" fill="#ff9aa2"/>
+    <path d="M30 60Q50 74 70 60" stroke="#2f6b25" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+  </svg>`,
+
+  pflaster: `<svg viewBox="0 0 100 100">
+    <g transform="rotate(-35 50 50)">
+      <rect x="8" y="35" width="84" height="30" rx="15" fill="#f5c28e" stroke="#cf9258" stroke-width="2.5"/>
+      <rect x="37" y="37" width="26" height="26" rx="4" fill="#fde7cf"/>
+      <g fill="#d9a06a"><circle cx="18" cy="45" r="1.6"/><circle cx="18" cy="55" r="1.6"/><circle cx="25" cy="50" r="1.6"/><circle cx="30" cy="44" r="1.6"/><circle cx="30" cy="56" r="1.6"/><circle cx="82" cy="45" r="1.6"/><circle cx="82" cy="55" r="1.6"/><circle cx="75" cy="50" r="1.6"/><circle cx="70" cy="44" r="1.6"/><circle cx="70" cy="56" r="1.6"/></g>
+      <path d="M50 57c-5-3.5-7-6-5.2-8.4c1.3-1.7 3.9-1.3 5.2.7c1.3-2 3.9-2.4 5.2-.7c1.8 2.4-.2 4.9-5.2 8.4z" fill="#ff6b8a"/>
+    </g>
+  </svg>`,
+
+  pflaume: `<svg viewBox="0 0 100 100">
+    <path d="M50 30Q54 18 60 12" stroke="#7a4e2a" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M56 20C64 8 80 8 86 14C78 22 66 26 56 20z" fill="#6cc24a" stroke="#4a9a30" stroke-width="2"/>
+    <ellipse cx="50" cy="60" rx="30" ry="33" fill="#7d3c98"/>
+    <path d="M50 28Q40 60 50 92" stroke="#5b2a70" stroke-width="3" fill="none" opacity=".7"/>
+    <ellipse cx="34" cy="48" rx="6" ry="11" fill="#fff" opacity=".35" transform="rotate(20 34 48)"/>
+  </svg>`,
+
+  pflanze: `<svg viewBox="0 0 100 100">
+    <path d="M50 62V22" stroke="#3f9a2e" stroke-width="4" stroke-linecap="round"/>
+    <g fill="#6cc24a" stroke="#3f9a2e" stroke-width="2">
+      <ellipse cx="36" cy="46" rx="15" ry="7" transform="rotate(25 36 46)"/>
+      <ellipse cx="64" cy="40" rx="15" ry="7" transform="rotate(-25 64 40)"/>
+      <ellipse cx="40" cy="28" rx="11" ry="5.5" transform="rotate(40 40 28)"/>
+      <ellipse cx="61" cy="55" rx="12" ry="6" transform="rotate(-20 61 55)"/>
+      <ellipse cx="51" cy="16" rx="5" ry="9" transform="rotate(10 51 16)"/>
+    </g>
+    <path d="M30 66H70L64 94H36z" fill="#d9773f" stroke="#a9532a" stroke-width="2.5" stroke-linejoin="round"/>
+    <rect x="25" y="60" width="50" height="10" rx="3" fill="#e88a52" stroke="#a9532a" stroke-width="2.5"/>
+  </svg>`
+};
+
+/* Hummel Fridolin – the wings flap via CSS, ".o" is the blowing mouth */
+const BEE = `<svg class="bee" viewBox="0 -8 124 108">
+  <g transform="rotate(-15 48 30)"><ellipse class="wing" cx="48" cy="16" rx="13" ry="20" fill="#e3f6ff" stroke="#8ccbe8" stroke-width="2.5" opacity=".95"/></g>
+  <g transform="rotate(15 66 30)"><ellipse class="wing" cx="66" cy="16" rx="13" ry="20" fill="#e3f6ff" stroke="#8ccbe8" stroke-width="2.5" opacity=".95" style="animation-delay:.045s"/></g>
+  <path d="M44 86 l-3 9 M58 88 v9 M72 85 l3 9" stroke="#3e2c23" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M17 57 L5 60 L17 63 Z" fill="#3e2c23"/>
+  <ellipse cx="52" cy="60" rx="36" ry="28" fill="#ffca28"/>
+  <path d="M28 39.1 L28 80.9 Q18 76 16 60 Q18 44 28 39.1Z" fill="#fff8e1"/>
+  <path d="M38 34.2 Q44 32 50 32 L50 88 Q44 88 38 85.8Z" fill="#3e2c23"/>
+  <path d="M62 33.1 Q67 34.5 72 36.7 L72 83.3 Q67 85.5 62 86.9Z" fill="#3e2c23"/>
+  <ellipse cx="52" cy="60" rx="36" ry="28" fill="none" stroke="#f0a500" stroke-width="3" stroke-dasharray="1.5 3.5" stroke-linecap="round"/>
+  <path d="M83 32 Q79 16 70 10 M97 31 Q103 15 112 10" fill="none" stroke="#3e2c23" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="70" cy="10" r="4.5" fill="#3e2c23"/><circle cx="112" cy="10" r="4.5" fill="#3e2c23"/>
+  <circle cx="90" cy="52" r="22" fill="#ffd54f"/>
+  <circle cx="90" cy="52" r="22" fill="none" stroke="#f0a500" stroke-width="3" stroke-dasharray="1.5 3.5" stroke-linecap="round"/>
+  <circle cx="83" cy="48" r="7" fill="#fff"/><circle cx="99" cy="48" r="7" fill="#fff"/>
+  <circle cx="85" cy="49" r="4.3" fill="#212121"/><circle cx="101" cy="49" r="4.3" fill="#212121"/>
+  <circle cx="86.5" cy="47" r="1.6" fill="#fff"/><circle cx="102.5" cy="47" r="1.6" fill="#fff"/>
+  <ellipse cx="78" cy="60" rx="4.5" ry="3" fill="#f48fb1" opacity=".75"/><ellipse cx="104" cy="60" rx="4.5" ry="3" fill="#f48fb1" opacity=".75"/>
+  <path class="smile" d="M85 61 Q91 67 97 61" fill="none" stroke="#3e2c23" stroke-width="2.6" stroke-linecap="round"/>
+  <ellipse class="o" cx="92" cy="63" rx="3.2" ry="3.8" fill="#3e2c23"/>
+</svg>`;
+
+const FLOWER = `<svg viewBox="0 0 100 100">
+  <g fill="#fff" stroke="#ffe082" stroke-width="3"><circle cx="50" cy="24" r="16"/><circle cx="75" cy="42" r="16"/><circle cx="66" cy="71" r="16"/><circle cx="34" cy="71" r="16"/><circle cx="25" cy="42" r="16"/></g>
+  <circle cx="50" cy="50" r="15" fill="#ff8a65"/>
+</svg>`;
+
+const GOAL = `<svg viewBox="0 0 100 140">
+  <path d="M50 60 Q46 100 50 138" stroke="#43a047" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <path d="M49 110 Q26 94 18 104 Q30 118 49 112Z M51 96 Q74 80 82 90 Q70 104 51 98Z" fill="#66bb6a"/>
+  <g class="petals"><g fill="#f48fb1"><circle cx="50" cy="26" r="17"/><circle cx="74" cy="44" r="17"/><circle cx="65" cy="72" r="17"/><circle cx="35" cy="72" r="17"/><circle cx="26" cy="44" r="17"/></g>
+  <circle cx="50" cy="50" r="16" fill="#ffca28"/><circle cx="45" cy="47" r="2" fill="#f0a500"/><circle cx="55" cy="47" r="2" fill="#f0a500"/><circle cx="50" cy="55" r="2" fill="#f0a500"/></g>
+</svg>`;
+
+const HEX = (on) => `<svg viewBox="0 0 100 100" class="${on ? 'on' : ''}">
+  <polygon points="50,5 89,27.5 89,72.5 50,95 11,72.5 11,27.5" fill="${on ? '#ffca28' : '#eeeeee'}" stroke="${on ? '#f0a500' : '#cfcfcf'}" stroke-width="7" stroke-linejoin="round"/>
+  ${on ? '<path d="M28 40 Q50 30 72 40 V50 Q68 60 64 50 Q60 44 56 54 Q52 62 48 52 Q42 42 36 52 Q32 58 28 50Z" fill="#ffe082"/>' : ''}
+</svg>`;
+
+/* ================= Words: F / Pf + consonant at the start ================= */
+const WORDS = [
+  { name: 'Flasche', img: 'flasche' },
+  { name: 'Flugzeug', img: 'flugzeug' },
+  { name: 'Fliege', img: 'fliege' },
+  { name: 'Flamme', img: 'flamme' },
+  { name: 'Flöte', img: 'floete' },
+  { name: 'Flagge', img: 'flagge' },
+  { name: 'Fledermaus', img: 'fledermaus' },
+  { name: 'Fliegenpilz', img: 'fliegenpilz' },
+  { name: 'Flamingo', img: 'flamingo' },
+  { name: 'Frosch', img: 'frosch' },
+  { name: 'Pflaster', img: 'pflaster' },
+  { name: 'Pflaume', img: 'pflaume' },
+  { name: 'Pflanze', img: 'pflanze' },
+];
+const ROUNDS = 5;          // pairs per game
+const BONUS_AFTER = 3;     // extra blow race after this many pairs
+
+const PRAISE = ['Super!', 'Toll!', 'Prima!', 'Klasse!', 'Spitze!', 'Juhu!'];
+const PARTY_TITLES = ['Super!', 'Toll gemacht!', 'Klasse!', 'Wow!', 'Juhu!'];
+
+/* ================= Helpers ================= */
+const $ = (s) => document.querySelector(s);
+const rand = (a) => a[Math.floor(Math.random() * a.length)];
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const shuffle = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const hl = (w) => w.replace(/^p?f/i, (m) => `<span class="f">${m}</span>`);
+const isPf = (w) => /^pf/i.test(w.name);
+
+document.querySelectorAll('[data-mascot]').forEach((m) => {
+  m.innerHTML = BEE;
+  m.addEventListener('click', () => { if (!listener) { wiggle(m); buzz(0.8); } });
+});
+$('#runner').innerHTML = BEE;
+$('#goal').innerHTML = GOAL;
+
+function wiggle(el) { el.classList.remove('wiggle'); void el.offsetWidth; el.classList.add('wiggle'); }
+
+function show(id) {
+  document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === id));
+  document.body.classList.toggle('bar', ['blow', 'board', 'say'].includes(id));
+  if (id === 'board') layout();
+}
+
+/* ---------- audio context ---------- */
+let actx;
+function audio() {
+  actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+  if (actx.state === 'suspended') actx.resume();
+  return actx;
+}
+
+/* ---------- speech ---------- */
+let voice = null;
+function pickVoice() {
+  const vs = speechSynthesis.getVoices().filter((v) => v.lang && v.lang.toLowerCase().startsWith('de'));
+  voice = vs.find((v) => /google|anna|petra|helena|katja/i.test(v.name)) || vs[0] || null;
+}
+if ('speechSynthesis' in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+
+function speak(text) {
+  return new Promise((resolve) => {
+    if (!('speechSynthesis' in window)) { resolve(); return; }
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'de-DE'; if (voice) u.voice = voice;
+    u.rate = 0.8; u.pitch = 1.2;
+    let done = false;
+    const fin = () => { if (!done) { done = true; resolve(); } };
+    u.onend = fin; u.onerror = fin;
+    setTimeout(fin, 1500 + text.length * 110);
+    speechSynthesis.speak(u);
+  });
+}
+
+/* Fridolin's "Fffff": broadband noise above ~1.4 kHz, softer and flatter than "sch".
+   For "Pf" a short low burst (the lips popping open) comes first. */
+function hiss(ms = 1000, pf = false) {
+  try {
+    const ctx = audio();
+    const len = Math.floor(ctx.sampleRate * (ms / 1000 + 0.1));
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    let t = ctx.currentTime + 0.02;
+    if (pf) {
+      const p = ctx.createBufferSource(); p.buffer = buf;
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1200;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.9, t + 0.005);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+      p.connect(lp).connect(g).connect(ctx.destination);
+      p.start(t); p.stop(t + 0.07);
+      t += 0.035;
+    }
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1400;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 8000;
+    const g = ctx.createGain(), end = t + ms / 1000;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.5, t + 0.07);
+    g.gain.setValueAtTime(0.5, end - 0.15);
+    g.gain.exponentialRampToValueAtTime(0.0001, end);
+    src.connect(hp).connect(lp).connect(g).connect(ctx.destination);
+    src.start(t); src.stop(end + 0.05);
+  } catch (e) { /* no audio – fine */ }
+  const el = document.querySelector('.screen.active .runner, .screen.active [data-mascot]');
+  if (el) {
+    el.classList.add('blowing');
+    const iv = setInterval(() => ffly(el, pf), 160);
+    setTimeout(() => { clearInterval(iv); el.classList.remove('blowing'); }, ms);
+  }
+  return wait(ms + 100);
+}
+
+/* ---------- sound effects ---------- */
+function tones(freqs, dur = 0.14, type = 'sine') {
+  try {
+    const ctx = audio(), t0 = ctx.currentTime;
+    freqs.forEach((f, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain(), t = t0 + i * dur;
+      o.type = type; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.2, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur * 1.8);
+      o.connect(g).connect(ctx.destination);
+      o.start(t); o.stop(t + dur * 2);
+    });
+  } catch (e) { /* no audio – fine */ }
+}
+
+/* a friendly bumble-bee "bzzz": sawtooth with a fast wobble */
+function buzz(sec = 1) {
+  try {
+    const ctx = audio(), t = ctx.currentTime;
+    const o = ctx.createOscillator(), lfo = ctx.createOscillator(), lg = ctx.createGain();
+    const lp = ctx.createBiquadFilter(), g = ctx.createGain();
+    o.type = 'sawtooth'; o.frequency.value = 190;
+    lfo.frequency.value = 16; lg.gain.value = 14;
+    lfo.connect(lg).connect(o.frequency);
+    lp.type = 'lowpass'; lp.frequency.value = 900;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.07, t + 0.1);
+    g.gain.setValueAtTime(0.07, t + sec - 0.2);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + sec);
+    o.connect(lp).connect(g).connect(ctx.destination);
+    o.start(t); lfo.start(t); o.stop(t + sec + 0.05); lfo.stop(t + sec + 0.05);
+  } catch (e) { /* no audio – fine */ }
+}
+
+/* ================= Microphone: local "f" detector =================
+   No speech recognition – just the spectrum:
+   - "f" / "pf": a soft hiss, energy spread over ~1.5–11 kHz, almost nothing low
+   - "l" + vowel (the swallowed version "lasche"): voiced, energy below 1 kHz dominates
+   Only the very start of the word decides, so "Flasche" counts and "lasche" doesn't.   */
+const Mic = {
+  ok: false, an: null, buf: null, binHz: 0, floor: null, handler: null, raf: 0, stream: null, src: null,
+
+  async init() {
+    if (this.ok) return true;
+    try {
+      const ctx = audio();
+      this.an = ctx.createAnalyser();
+      this.an.fftSize = 1024;
+      this.an.smoothingTimeConstant = 0.3;
+      this.buf = new Float32Array(this.an.frequencyBinCount);
+      this.binHz = ctx.sampleRate / this.an.fftSize;
+      await this.open();
+      await wait(200);
+      await this.calibrate();
+      this.close();
+      this.ok = true;
+    } catch (e) { this.close(); this.ok = false; }
+    return this.ok;
+  },
+
+  /* The mic is only open while listening: on Android an open mic switches audio
+     into "call mode", which sends speech and sounds to the quiet earpiece. */
+  async open() {
+    if (this.stream) return;
+    this.stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+    });
+    this.src = audio().createMediaStreamSource(this.stream);
+    this.src.connect(this.an);
+  },
+
+  close() {
+    if (this.src) this.src.disconnect();
+    if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
+    this.src = this.stream = null;
+  },
+
+  bands() {
+    this.an.getFloatFrequencyData(this.buf);
+    const sum = (lo, hi) => {
+      let s = 0;
+      const a = Math.floor(lo / this.binHz), b = Math.min(this.buf.length - 1, Math.ceil(hi / this.binHz));
+      for (let i = a; i <= b; i++) s += Math.pow(10, this.buf[i] / 10);
+      return s;
+    };
+    return { low: sum(100, 900), mid: sum(1500, 5500), high: sum(5500, 11000) };
+  },
+
+  async calibrate() {
+    const acc = { low: 0, mid: 0, high: 0 }, n = 25;
+    for (let i = 0; i < n; i++) {
+      await wait(20);
+      const b = this.bands();
+      for (const k in acc) acc[k] += b[k] / n;
+    }
+    for (const k in acc) acc[k] = Math.max(acc[k], 1e-9);
+    this.floor = acc;
+  },
+
+  analyse() {
+    const b = this.bands(), f = this.floor;
+    // "f" is a quiet sound, so the hiss bands get a lower loudness threshold than the voice band
+    const loud = b.low > f.low * 8 || b.mid > f.mid * 5 || b.high > f.high * 5;
+    const low = Math.max(0, b.low - f.low * 2), mid = Math.max(0, b.mid - f.mid * 2), high = Math.max(0, b.high - f.high * 2);
+    const fric = loud && mid + high > 2.5 * low;
+    if (!loud) for (const k in f) f[k] = Math.max(1e-9, f[k] * 0.995 + b[k] * 0.005);  // follow room noise slowly
+    const level = Math.min(1, Math.max(0, Math.log10((b.low + b.mid + b.high) / (f.low + f.mid + f.high)) / 3));
+    return { loud, fric, level };
+  },
+
+  async start(handler) {
+    this.stop();
+    this.handler = handler;
+    try { await this.open(); } catch (e) { return; }
+    if (this.handler !== handler) { this.close(); return; }   // listening ended meanwhile
+    const t0 = performance.now();
+    let last = t0;
+    const loop = (t) => {
+      if (this.handler !== handler) return;
+      const dt = Math.min(100, t - last); last = t;
+      if (t - t0 < 200) { this.raf = requestAnimationFrame(loop); return; }  // skip the mic's switch-on pop
+      handler(this.analyse(), dt, t);
+      if (this.handler === handler) this.raf = requestAnimationFrame(loop);
+    };
+    this.raf = requestAnimationFrame(loop);
+  },
+
+  stop() { cancelAnimationFrame(this.raf); this.handler = null; this.close(); }
+};
+
+/* ---------- listening sessions ---------- */
+let listener = null;
+
+function activeMic() { return document.querySelector('.screen.active .mic'); }
+
+function beginListen(l) {
+  listener = l;
+  document.body.classList.add('listen');
+  const m = activeMic(); if (m) m.classList.add('listening');
+}
+
+function endListen(value) {
+  if (!listener) return;
+  const l = listener; listener = null;
+  Mic.stop();
+  clearTimeout(l.timer); clearInterval(l.iv);
+  document.body.classList.remove('listen');
+  document.querySelectorAll('.mic').forEach((m) => { m.classList.remove('listening', 'hearf'); m.style.setProperty('--lvl', 0); });
+  l.resolve(value);
+}
+
+let lastMicFly = 0;
+function meter(r, t) {
+  const m = activeMic(); if (!m) return;
+  m.style.setProperty('--lvl', r.level.toFixed(2));
+  m.classList.toggle('hearf', r.fric);
+  if (r.fric && t - lastMicFly > 250) { lastMicFly = t; ffly(m); }
+}
+
+/* Listen for one spoken word; resolves 'f' | 'other' | 'timeout' | 'replay' | 'nomic' */
+function listenWord(timeout = 9000) {
+  return new Promise((resolve) => {
+    beginListen({ resolve, kind: 'word' });
+    if (!Mic.ok) { listener.timer = setTimeout(() => endListen('nomic'), 7000); return; }
+    let state = 'wait', t0 = null, onsetT = 0, nl = 0, fc = 0, quiet = 0, verdict = 'other';
+    Mic.start((r, dt, t) => {
+      if (t0 === null) t0 = t;
+      meter(r, t);
+      if (state === 'wait') {
+        if (r.loud) { state = 'onset'; onsetT = t; nl = fc = 0; }
+        else if (t - t0 > timeout) return endListen('timeout');
+      }
+      if (state === 'onset') {
+        // only the first ~quarter second decides: does the word START with the f hiss?
+        if (r.loud) nl++;
+        if (r.fric) fc++;
+        if (t - onsetT > 240) {
+          if (nl < 5) { state = 'wait'; return; }               // just a click or bump
+          verdict = fc >= 3 ? 'f' : 'other';
+          state = 'tail'; quiet = 0;
+        }
+      } else if (state === 'tail') {
+        quiet = r.loud ? 0 : quiet + dt;
+        if (quiet > 350 || t - onsetT > 3000) endListen(verdict);
+      }
+    });
+  });
+}
+
+/* Blow race: Fridolin flies while the child makes a long "fffff" */
+function listenBlow(need, onProg) {
+  return new Promise((resolve) => {
+    let acc = 0;
+    const prog = (v) => { acc = v; onProg(Math.min(1, acc / need)); if (acc >= need) endListen(true); };
+    beginListen({ resolve, kind: 'blow', onParent: () => prog(need) });
+    const runner = $('#runner');
+    if (!Mic.ok) {
+      runner.classList.add('blowing');
+      listener.iv = setInterval(() => { prog(acc + need / 30); if (listener) ffly(runner); }, 160);
+      return;
+    }
+    let idle = 0, paused = false, lastFly = 0;
+    Mic.start(async (r, dt, t) => {
+      if (paused) return;
+      meter(r, t);
+      runner.classList.toggle('blowing', r.loud);
+      if (r.fric) {
+        idle = 0;
+        if (t - lastFly > 160) { lastFly = t; ffly(runner); }
+        prog(acc + dt);
+      } else if (r.loud) {
+        idle = 0;
+        prog(acc + dt * 0.3);          // any puff helps a little, so nobody gets stuck
+      } else {
+        idle += dt;
+      }
+      if (!listener) return;
+      if (idle > 9000) {
+        idle = 0; paused = true;
+        runner.classList.remove('blowing');
+        await speak('Mach mit! Puste so:');
+        await hiss(1200);
+        await wait(250);
+        paused = false;
+      }
+    });
+  });
+}
+
+/* Parent override: hold 👍 for 0.7 s */
+(() => {
+  const b = $('#parentOk'); let timer = null;
+  const cancel = () => { clearTimeout(timer); b.classList.remove('holding'); };
+  b.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); b.classList.add('holding');
+    timer = setTimeout(() => {
+      cancel();
+      if (!listener) return;
+      if (listener.onParent) listener.onParent(); else endListen('f');
+    }, 700);
+  });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => b.addEventListener(ev, cancel));
+})();
+
+/* ---------- effects ---------- */
+/* little "fff" puffs blowing out of Fridolin's mouth (or the mic) */
+function ffly(el, pf = false) {
+  const r = el.getBoundingClientRect();
+  const s = document.createElement('div');
+  s.className = 'ffly';
+  s.textContent = pf && Math.random() < 0.3 ? 'pf' : rand(['f', 'ff', 'fff']);
+  const isBee = el.matches('.mascot');
+  s.style.left = (r.left + r.width * (isBee ? 0.85 : 0.5)) + 'px';
+  s.style.top = (r.top + r.height * (isBee ? 0.6 : 0.3)) + 'px';
+  s.style.setProperty('--dx', (isBee ? 50 + Math.random() * 60 : Math.random() * 60 - 30) + 'px');
+  s.style.setProperty('--dy', (isBee ? Math.random() * 40 - 20 : -70) + 'px');
+  document.body.appendChild(s);
+  setTimeout(() => s.remove(), 1000);
+}
+
+function sparkle(el, n = 12) {
+  const r = el.getBoundingClientRect();
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  for (let i = 0; i < n; i++) {
+    const s = document.createElement('div');
+    s.className = 'spark';
+    s.textContent = rand(['★', '✦', '♥', '✿']);
+    s.style.color = rand(['#ffca28', '#ff7043', '#ec407a', '#66bb6a', '#42a5f5']);
+    const a = (i / n) * Math.PI * 2, d = r.width * 0.6 + Math.random() * 40;
+    s.style.left = cx + 'px'; s.style.top = cy + 'px';
+    s.style.setProperty('--dx', Math.cos(a) * d + 'px');
+    s.style.setProperty('--dy', Math.sin(a) * d + 'px');
+    document.body.appendChild(s);
+    setTimeout(() => s.remove(), 1000);
+  }
+}
+
+function confetti(n = 80) {
+  const colors = ['#ef5350', '#ffca28', '#66bb6a', '#42a5f5', '#ab47bc', '#ff7043', '#ec407a'];
+  for (let i = 0; i < n; i++) {
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    c.style.left = Math.random() * 100 + 'vw';
+    c.style.background = rand(colors);
+    c.style.borderRadius = Math.random() < 0.4 ? '50%' : '3px';
+    c.style.setProperty('--r', (Math.random() * 1080 - 540) + 'deg');
+    const dur = 2 + Math.random() * 2;
+    c.style.animationDuration = dur + 's';
+    c.style.animationDelay = Math.random() * 0.8 + 's';
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), (dur + 1) * 1000);
+  }
+}
+
+/* Fridolin leaves his corner, flies a big figure-eight over the board and comes back */
+function flyBee() {
+  const host = $('#boardBee');
+  const r0 = host.getBoundingClientRect();
+  const home = [r0.left + r0.width / 2, r0.top + r0.height / 2];
+  const cx = innerWidth / 2, cy = innerHeight / 2 + 20;
+  const rx = Math.min(innerWidth * 0.36, 360), ry = Math.min(innerHeight * 0.25, 200);
+  const pts = [home];
+  for (let i = 0; i <= 32; i++) { const a = (i / 32) * Math.PI * 2; pts.push([cx + rx * Math.sin(a), cy + ry * Math.sin(2 * a)]); }
+  pts.push(home);
+  const dist = [0];
+  for (let i = 1; i < pts.length; i++) dist.push(dist[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  const total = dist[dist.length - 1];
+  const frames = pts.map((p, i) => {
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
+    const dir = b[0] < a[0] ? -1 : 1;
+    return { offset: dist[i] / total, transform: `translate(${p[0]}px, ${p[1]}px) translate(-50%, -50%) scaleX(${dir})` };
+  });
+
+  const el = document.createElement('div');
+  el.className = 'flyer';
+  el.style.width = r0.width * 1.3 + 'px';
+  el.innerHTML = BEE;
+  document.body.appendChild(el);
+  host.style.visibility = 'hidden';
+  buzz(3);
+  const trail = setInterval(() => {
+    const r = el.getBoundingClientRect();
+    const s = document.createElement('div');
+    s.className = 'spark';
+    s.textContent = rand(['♥', '✦', '✿']);
+    s.style.fontSize = '22px';
+    s.style.color = rand(['#ffca28', '#ec407a', '#ff7043']);
+    s.style.left = r.left + r.width / 2 + 'px'; s.style.top = r.top + r.height * 0.7 + 'px';
+    s.style.setProperty('--dx', (Math.random() * 30 - 15) + 'px');
+    s.style.setProperty('--dy', 40 + Math.random() * 30 + 'px');
+    document.body.appendChild(s);
+    setTimeout(() => s.remove(), 1000);
+  }, 110);
+  const anim = el.animate(frames, { duration: 3200, easing: 'ease-in-out' });
+  anim.onfinish = () => { clearInterval(trail); el.remove(); host.style.visibility = ''; wiggle(host); };
+}
+
+/* ================= Game ================= */
+const grid = $('#grid');
+let chosen = [], firstCard = null, lock = true, found = 0;
+
+function renderProgress(popIndex = -1) {
+  $('#progress').innerHTML = chosen.map((_, i) => HEX(i < found)).join('');
+  $('#progress').querySelectorAll('svg').forEach((s, i) => { if (i !== popIndex) s.classList.remove('on'); });
+}
+
+/* biggest card size that fits all cards on screen */
+function layout() {
+  const n = grid.children.length;
+  if (!n) return;
+  const top = parseFloat(getComputedStyle($('#board')).paddingTop) || 70;
+  const W = innerWidth - 32, H = innerHeight - top - 24;
+  const gap = Math.round(Math.max(8, Math.min(18, Math.min(W, H) / 40)));
+  let best = { cs: 0, cols: n };
+  for (let cols = 1; cols <= n; cols++) {
+    const rows = Math.ceil(n / cols);
+    const cs = Math.min((W - gap * (cols - 1)) / cols, (H - gap * (rows - 1)) / rows / 1.12);
+    if (cs > best.cs + 0.5) best = { cs, cols };
+  }
+  grid.style.setProperty('--cs', Math.floor(Math.min(best.cs, 230)) + 'px');
+  grid.style.setProperty('--cols', best.cols);
+  grid.style.setProperty('--gap', gap + 'px');
+}
+addEventListener('resize', layout);
+
+function deal() {
+  grid.innerHTML = '';
+  shuffle([...chosen, ...chosen]).forEach((w, i) => {
+    const c = document.createElement('button');
+    c.className = 'card';
+    c.setAttribute('aria-label', 'Karte');
+    c.innerHTML = `<div class="deal" style="animation-delay:${i * 70}ms"><div class="inner">
+      <div class="face back">${FLOWER}</div>
+      <div class="face front"><div class="pic">${IMG[w.img]}</div><div class="cap">${hl(w.name)}</div></div>
+    </div></div>`;
+    c.word = w;
+    c.addEventListener('click', () => flip(c));
+    grid.appendChild(c);
+  });
+}
+
+async function newGame() {
+  $('#playBtn').disabled = $('#againBtn').disabled = true;
+  audio();
+  // Speak once right inside the tap – mobile Chrome may otherwise block later speech.
+  if (window.speechSynthesis) speechSynthesis.speak(new SpeechSynthesisUtterance(' '));
+  await Mic.init();
+  document.body.classList.toggle('nomic', !Mic.ok);
+  $('#playBtn').disabled = $('#againBtn').disabled = false;
+
+  // mostly "Fl/Fr" words, plus one or two "Pfl" words
+  const pf = shuffle(WORDS.filter(isPf)), fl = shuffle(WORDS.filter((w) => !isPf(w)));
+  const k = 1 + (Math.random() < 0.5 ? 1 : 0);
+  chosen = shuffle([...pf.slice(0, k), ...fl.slice(0, ROUNDS - k)]);
+  found = 0; firstCard = null; lock = true;
+  renderProgress();
+  deal();
+  await blowRound(true);
+  show('board');
+  lock = false;
+  speak('Finde zwei gleiche Bilder!');
+}
+
+/* --- 1. blow race: just the sound --- */
+async function blowRound(first) {
+  const runner = $('#runner');
+  const setP = (p) => runner.style.setProperty('--p', p.toFixed(3));
+  setP(0);
+  runner.classList.remove('blowing');
+  $('#goal').classList.remove('bloom');
+  show('blow');
+  await speak(first
+    ? 'Hallo! Ich bin Fridolin, die Hummel. Ich will zur Blume fliegen. Puste mich hin! Mach ganz lange so:'
+    : 'Fridolin hat schon wieder Hunger! Puste ihn zur Blume. So:');
+  await hiss(1500);
+  await wait(200);
+  await listenBlow(2400, setP);
+  runner.classList.remove('blowing');
+  $('#goal').classList.add('bloom');
+  wiggle(runner);
+  tones([523, 659, 784, 1047], 0.12);
+  confetti(60);
+  await speak('Mmh, lecker Nektar! Danke!');
+  await wait(300);
+}
+
+/* --- 2. memory: find two equal pictures --- */
+async function flip(c) {
+  if (lock || c.classList.contains('up')) return;
+  c.classList.add('up');
+  tones([520, 780], 0.07);
+  speak(c.word.name);                  // hear the word with its F once more
+  if (!firstCard) { firstCard = c; return; }
+  const a = firstCard; firstCard = null;
+  lock = true;
+
+  if (a.word !== c.word) {
+    await wait(1400);
+    a.classList.add('nope'); c.classList.add('nope');
+    tones([330, 247], 0.13, 'triangle');
+    await wait(500);
+    a.classList.remove('up', 'nope'); c.classList.remove('up', 'nope');
+    lock = false;
+    return;
+  }
+
+  await wait(900);
+  [a, c].forEach((x) => { x.classList.add('match'); sparkle(x); });
+  tones([660, 880, 1320]);
+  wiggle($('#boardBee'));
+  await speak(rand(['Ein Paar!', 'Gefunden!', 'Zwei gleiche!']));
+  await sayRound(c.word);
+  await pairSolved(c.word);
+
+  show('board');
+  found++;
+  renderProgress(found - 1);
+  [a, c].forEach((x) => { x.classList.remove('match'); x.classList.add('done'); sparkle(x, 16); });
+  flyBee();
+  await wait(3400);
+  if (found >= chosen.length) { finish(); return; }
+  if (found === BONUS_AFTER) { await blowRound(false); show('board'); }
+  lock = false;
+}
+
+/* --- 3. speak: the child says the word --- */
+async function modelWord(w, intro) {
+  if (intro) await speak(intro);
+  await hiss(900, isPf(w));
+  await wait(80);
+  await speak(w.name + '!');
+  await wait(250);
+}
+
+async function sayRound(w) {
+  const card = $('#sayCard');
+  $('#sayPic').innerHTML = IMG[w.img];
+  $('#sayCap').innerHTML = hl(w.name);
+  card.className = 'bigcard enter';
+  show('say');
+  await modelWord(w, 'Jetzt du! Sag es wie Fridolin:');
+  let tries = 0;
+  while (true) {
+    const r = await listenWord();
+    if (r === 'replay') { await modelWord(w, 'Hör mal:'); continue; }
+    if (r === 'f' || r === 'nomic') {
+      card.className = 'bigcard right';
+      sparkle(card);
+      tones([660, 880, 1320, 1760]);
+      wiggle($('#say [data-mascot]'));
+      await speak(r === 'f' ? `${rand(PRAISE)} Ich habe dein Pusten gehört!` : rand(PRAISE));
+      return true;
+    }
+    tries++;
+    if (tries >= 3) { await speak('Gut geübt! Weiter geht es!'); return false; }
+    card.className = 'bigcard';
+    if (r === 'timeout') await modelWord(w, 'Sag mal:');
+    else await modelWord(w, isPf(w) ? 'Fast! Mach erst ganz fest Pf, so:' : 'Fast! Fang mit dem Pusten an, so:');
+  }
+}
+
+/* --- 4. celebrate --- */
+async function pairSolved(w) {
+  $('#partyTitle').textContent = rand(PARTY_TITLES);
+  $('#partyPic').innerHTML = IMG[w.img];
+  $('#partyCap').innerHTML = hl(w.name);
+  const t = $('#partyTitle'); t.style.animation = 'none'; void t.offsetWidth; t.style.animation = '';
+  const pc = $('#partyCard'); pc.classList.remove('right'); void pc.offsetWidth; pc.classList.add('right');
+  show('party');
+  confetti();
+  tones([523, 659, 784, 1047, 784, 1047], 0.12);
+  await speak(`Juhu! ${w.name}!`);
+  await wait(900);
+}
+
+function finish() {
+  const st = $('#stickers');
+  st.innerHTML = '';
+  chosen.forEach((w, i) => {
+    const b = document.createElement('button');
+    b.setAttribute('aria-label', w.name);
+    b.style.animationDelay = (0.3 + i * 0.15) + 's';
+    b.innerHTML = IMG[w.img];
+    b.addEventListener('click', () => { sparkle(b, 8); modelWord(w); });
+    st.appendChild(b);
+  });
+  show('end');
+  confetti(160);
+  setTimeout(() => confetti(120), 1500);
+  tones([523, 659, 784, 1047, 1319, 1568], 0.13);
+  speak('Hurra! Du bist ein F-Profi!').then(() => hiss(1200));
+}
+
+/* ================= Wiring ================= */
+$('#sayCard').addEventListener('click', () => { if (listener && listener.kind === 'word') endListen('replay'); });
+$('#playBtn').addEventListener('click', newGame);
+$('#againBtn').addEventListener('click', newGame);
+</script>
+</body>
+</html>
